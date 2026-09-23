@@ -48,7 +48,8 @@ runtime can start. On Linux with bubblewrap available, the wizard runs with an
 empty home and isolated command path, a read-only host filesystem, and fake
 package-manager/tool installers. Both successful provisioning and package
 installation failure are checked. These fixtures do not verify actual package
-downloads, sudo authentication, gopass key generation, or a fresh Omarchy VM.
+downloads, sudo authentication, or a fresh Omarchy VM. Separate real-VM
+evidence is recorded in [official ISO installation verification](FRESH-INSTALL-VERIFICATION.md).
 Tests skip the bubblewrap cases when user namespaces are unavailable.
 
 The missing-dependency Settings screen is rendered with fictional data using
