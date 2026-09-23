@@ -19,12 +19,14 @@ TestCase {
         function saveKey(key) {}
     }
     Settings { id: settings; anchors.fill: parent; service: fake; opened: true }
+    SignalSpy { id: dismissSpy; target: settings; signalName: "dismiss" }
     function test_missing_runtime_guides_setup_before_key() {
         fake.setupRequired = true
         compare(findChild(settings, "apiKeyInput").enabled, false)
         const button = findChild(settings, "setupButton")
         button.clicked()
         compare(fake.setupCalls, 1)
+        compare(dismissSpy.count, 1)
         fake.setupRequired = false
         compare(findChild(settings, "apiKeyInput").enabled, true)
     }

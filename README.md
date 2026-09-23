@@ -30,7 +30,8 @@ It requires an OpenAI API key; API usage is billed separately.
 - `grim`, `wtype`, `hyprctl`, `xdg-open`, and `setpriv`.
 - Optional mouse clicks: a C compiler, `wayland-scanner`, and Wayland client headers.
 - An OpenAI API key with access to the configured Realtime and Codex models.
-- An initialized, unlocked **gopass** store to save a key through Settings.
+- Desktop Secret Service and `secret-tool` (included in standard Omarchy)
+  to save a key through Settings.
   Alternatively, provide `OPENAI_API_KEY` in the desktop session environment.
 - Optional camera support: FFmpeg and `v4l2-ctl`.
 - Optional voice wake: Python venv/pip and the Vosk model installed by `scripts/setup-wake`.
@@ -45,8 +46,9 @@ omarchy plugin add https://github.com/komagata/oma --enable
 
 1. Choose the center bar section if prompted, then click the brain icon.
 2. Click **SET UP**. A terminal wizard offers missing system packages, Codex,
-   encrypted key storage, mouse control, voice wake, and the F8 shortcut.
-   Package installation may ask for your system password. Optional steps can be
+   mouse control, voice wake, and the F8 shortcut.
+   The first package installation runs the standard Omarchy update first,
+   including package-list synchronization and system updates. It may ask for your system password. Optional steps can be
    skipped; an existing F8 binding is preserved.
 3. Return to O.M.A. and click **CHECK AGAIN**. Paste your OpenAI API key and click
    **SAVE KEY**, then **START O.M.A.**
@@ -74,15 +76,18 @@ optional and requires FFmpeg and `v4l2-ctl`.
 
 On first launch without a key, the welcome page explains the requirement and
 opens the API-key field. Later, choose **SETTINGS** or right-click the bar icon.
-Keys are masked and passed to gopass over stdin, never returned to the UI.
+Keys are masked and passed to the desktop keyring over stdin, never returned to the UI.
 
 Lookup order:
 
-1. gopass: `projects/oma/openai/api-key`
-2. `OPENAI_API_KEY` in the desktop session environment
-3. gopass: `personal/openai/api-key`
+1. Desktop keyring: application `io.github.komagata.oma`, credential `openai-api-key`
+2. Existing gopass entry: `projects/oma/openai/api-key`
+3. `OPENAI_API_KEY` in the desktop session environment
+4. Existing gopass entry: `personal/openai/api-key`
 
-Saving changes only O.M.A.'s dedicated entry and restarts its worker.
+Saving changes only O.M.A.'s dedicated desktop-keyring entry and restarts its worker.
+The login keyring normally unlocks with your desktop login; no GPG identity or
+separate password-store wizard is needed. Existing gopass entries are left intact.
 
 ## Use
 
@@ -183,7 +188,7 @@ omarchy plugin remove io.github.komagata.oma
 ```
 
 Remove the F8 binding you added and reload Hyprland. Removal leaves conversation
-data, downloaded wake dependencies, and the gopass entry intact. To erase private
+data, downloaded wake dependencies, and credential-store entries intact. To erase private
 history, stop O.M.A. and remove its data directory. Its Codex store is separate
 from your normal Codex configuration.
 

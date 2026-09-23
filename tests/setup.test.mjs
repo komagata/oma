@@ -7,6 +7,7 @@ test('setup check reports missing tools without Node or a working runtime',()=>{
  assert.equal(result.setupRequired,true);
  assert.match(result.setupMessage,/Node.js 24/);
  assert.match(result.setupMessage,/Codex/);
+ assert.match(result.setupMessage,/key storage/);
 });
 test('setup check never contains credentials',()=>{
  const result=execFileSync('/usr/bin/python3',[script],{env:{PATH:'/nonexistent',OPENAI_API_KEY:'secret-fixture'},encoding:'utf8'});
@@ -26,7 +27,7 @@ for (const failInstall of [false,true]) test('isolated first installation '+(fai
  for(const name of ['dirname','python3','find','grep'])symlinkSync('/usr/bin/'+name,join(bin,name));
  const executable=(name,body)=>writeFileSync(join(bin,name),'#!/bin/bash\n'+body,{mode:0o755});
  executable('sudo',`echo "$*" >> "${dir}/commands"
-${failInstall?'exit 1':`for name in node pw-record pw-play pw-cli wpctl grim wtype xdg-open setpriv gopass; do
+${failInstall?'exit 1':`for name in node pw-record pw-play pw-cli wpctl grim wtype xdg-open setpriv secret-tool; do
 printf '#!/bin/bash\\necho 24\\n' > "${bin}/$name"
 chmod +x "${bin}/$name"
 done`}
@@ -36,6 +37,7 @@ done`}
  executable('hyprctl','exit 0');
  executable('mise','exit 0');
  executable('omarchy',`echo "$*" >> "${dir}/commands"
+[[ "$1" == mise ]] || exit 0
 printf '#!/bin/bash\\necho codex-cli-test\\n' > "${bin}/codex"
 /usr/bin/chmod +x "${bin}/codex"
 `);
@@ -47,6 +49,7 @@ printf '#!/bin/bash\\necho codex-cli-test\\n' > "${bin}/codex"
  assert.ok(result.stdout.includes('O.M.A.'),result.stderr+result.stdout);
  const log=readFileSync(join(dir,'commands'),'utf8');
  assert.match(log,/pipewire-audio/);
+ assert.match(log,/update -y/);
  if(failInstall){
   assert.notEqual(result.status,0);
   assert.match(result.stdout,/Setup did not finish/);

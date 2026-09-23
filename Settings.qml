@@ -32,14 +32,14 @@ Item {
         }
         Text {
             width: parent.width
-            text: "First time here? SET UP opens a guided terminal wizard for dependencies, secure key storage, F8, mouse control and voice wake."
+            text: "First time here? SET UP opens a guided terminal wizard for dependencies, F8, mouse control and voice wake."
             color: ink.secondary; wrapMode: Text.Wrap; font.pixelSize: 13
         }
         Row {
             spacing: 16
             Button {
                 id: setupButton; objectName: "setupButton"; text: "SET UP"
-                onClicked: if (root.service && root.service.setup) root.service.setup()
+                onClicked: if (root.service && root.service.setup) { root.service.setup(); root.dismiss() }
                 background: Rectangle { color: ink.selected; border.color: ink.muted }
                 contentItem: Text { text: setupButton.text; color: ink.text; font.pixelSize: 14 }
             }
@@ -58,7 +58,7 @@ Item {
             enabled: !root.needsSetup && (!root.service || !root.service.keySaving)
             background: Rectangle { color: ink.field; border.color: keyInput.activeFocus ? ink.muted : ink.border }
         }
-        Text { width: parent.width; text: "Your key is stored securely in gopass. OpenAI API usage is billed to your OpenAI account."; color: ink.secondary; wrapMode: Text.Wrap; font.pixelSize: 13 }
+        Text { width: parent.width; text: "Your key is stored securely in your desktop keyring. OpenAI API usage is billed to your OpenAI account."; color: ink.secondary; wrapMode: Text.Wrap; font.pixelSize: 13 }
         Text {
             text: "GET AN OPENAI API KEY ↗"; color: ink.accent; font.pixelSize: 14
             MouseArea { anchors.fill: parent; anchors.margins: -8; onClicked: Qt.openUrlExternally("https://platform.openai.com/api-keys") }
