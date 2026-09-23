@@ -7,7 +7,7 @@ python -m venv "$oma_data/wake-venv"
 "$oma_data/wake-venv/bin/pip" install 'vosk==0.3.45'
 archive="$(mktemp)"
 trap 'rm -f "$archive"' EXIT
-curl -fL --max-time 180 https://alphacephei.com/vosk/models/vosk-model-small-ja-0.22.zip -o "$archive"
+curl -fL --retry 2 --retry-delay 2 --connect-timeout 15 --max-time 600 https://alphacephei.com/vosk/models/vosk-model-small-ja-0.22.zip -o "$archive"
 python - "$archive" "$oma_data/models" <<'PY'
 import pathlib,sys,zipfile
 root=pathlib.Path(sys.argv[2]).resolve()

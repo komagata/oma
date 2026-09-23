@@ -18,11 +18,11 @@ install_packages() {
   if pacman -Q "$@" >/dev/null 2>&1; then return 0; fi
   if [[ $packages_synced == false ]]; then
     echo "Refreshing package lists and applying system updates before installing dependencies."
-    omarchy update -y
-    sudo pacman -S --needed "$@"
+    omarchy update -y || return $?
+    sudo pacman -S --needed "$@" || return $?
     packages_synced=true
   else
-    sudo pacman -S --needed "$@"
+    sudo pacman -S --needed "$@" || return $?
   fi
 }
 echo "O.M.A. — first-time setup"
@@ -77,13 +77,16 @@ if ! find /usr/lib/spa-0.2/aec -name 'libspa-aec-webrtc.so' -print -quit 2>/dev/
 fi
 echo "API keys use your desktop's login keyring. No separate password-store setup is needed."
 if ask "Enable mouse control (install build tools and compile the helper)?"; then
-  install_packages gcc wayland
-  "$root/scripts/build-pointer"
+  if ! install_packages gcc wayland || ! "$root/scripts/build-pointer"; then
+    echo "Mouse control was not installed. Voice and keyboard control still work; rerun SET UP to retry."
+  fi
 fi
 if ask "Install Hey O.M.A. voice wake (downloads a Japanese speech model)?"; then
-  install_packages python python-pip curl
-  "$root/scripts/setup-wake"
-  echo "Enable VOICE WAKE in O.M.A. Settings after saving your API key."
+  if install_packages python python-pip curl && "$root/scripts/setup-wake"; then
+    echo "Enable VOICE WAKE in O.M.A. Settings after saving your API key."
+  else
+    echo "Voice wake was not installed. F8 and the bar icon still work; rerun SET UP to retry."
+  fi
 fi
 bindings="$HOME/.config/hypr/bindings.lua"
 if [[ -f "$bindings" ]] && ! grep -q 'io.github.komagata.oma open' "$bindings"; then

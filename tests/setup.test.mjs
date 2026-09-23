@@ -19,7 +19,9 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 
-for (const failInstall of [false,true]) test('isolated first installation '+(failInstall?'keeps package failure visible':'installs missing dependencies'),t=>{
+for (const scenario of ['success','packageFailure','wakeFailure']) test('isolated first installation: '+scenario,t=>{
+ const failInstall=scenario==='packageFailure';
+ const failWake=scenario==='wakeFailure';
  if(spawnSync('bwrap',['--ro-bind','/','/','--','true']).status!==0){t.skip('bubblewrap unavailable');return;}
  const dir=mkdtempSync(join(tmpdir(),'oma-setup-test-'));
  t.after(()=>rmSync(dir,{recursive:true,force:true}));
@@ -34,6 +36,7 @@ done`}
 `);
  // Fake package installation uses chmod through an absolute path.
  writeFileSync(join(bin,'sudo'),readFileSync(join(bin,'sudo'),'utf8').replace('chmod +x','/usr/bin/chmod +x'),{mode:0o755});
+ if(failWake)executable('bash','echo Wake download failed >&2; exit 23');
  executable('hyprctl','exit 0');
  executable('mise','exit 0');
  executable('omarchy',`echo "$*" >> "${dir}/commands"
@@ -45,7 +48,7 @@ printf '#!/bin/bash\\necho codex-cli-test\\n' > "${bin}/codex"
  const result=spawnSync('bwrap',['--ro-bind','/','/','--dev','/dev','--bind',dir,dir,
   '--tmpfs','/home','--dir','/home/komagata','--ro-bind',root,'/home/oma',
   '--setenv','PATH',bin,'--','/bin/bash','/home/oma/scripts/setup'],
-  {input:'y\ny\nn\nn\n\n',encoding:'utf8',timeout:15000});
+  {input:failWake?'y\ny\nn\ny\n\n':'y\ny\nn\nn\n\n',encoding:'utf8',timeout:15000});
  assert.ok(result.stdout.includes('O.M.A.'),result.stderr+result.stdout);
  const log=readFileSync(join(dir,'commands'),'utf8');
  assert.match(log,/pipewire-audio/);
@@ -58,5 +61,6 @@ printf '#!/bin/bash\\necho codex-cli-test\\n' > "${bin}/codex"
   assert.equal(result.status,0,result.stdout+result.stderr);
   assert.match(log,/mise install codex/);
   assert.match(result.stdout,/CHECK AGAIN/);
+  if(failWake)assert.match(result.stdout,/Voice wake was not installed/);
  }
 });

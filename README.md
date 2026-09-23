@@ -65,7 +65,8 @@ If the setup window does not open, run:
 
 Setup can be rerun after a failed download or to add optional features. It
 preserves conversation history and existing keys. If a step fails, its error
-stays visible in the terminal. For an old Node.js selected through a version
+stays visible in the terminal. Optional mouse/wake setup failures do not block
+F8 or the bar icon; rerun SET UP to retry those features. For an old Node.js selected through a version
 manager, update that installation to version 24+ and rerun setup.
 
 Voice wake currently uses a Japanese Vosk model; other accents are not yet
