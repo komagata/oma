@@ -13,7 +13,7 @@ dest="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins/io.github.komagata.oma"
 python3 - "$root" "$dest" <<'PY'
 import sys,shutil,pathlib,hashlib,json,tempfile
 src,dst=map(pathlib.Path,sys.argv[1:]);dst.mkdir(parents=True,exist_ok=True)
-files=sorted([*src.glob('*.qml'),*src.glob('runtime/*.mjs'),*src.glob('runtime/*.py'),src/'runtime/oma-pointer',*src.glob('assets/*'),*src.glob('skills/*/SKILL.md'),*[p for p in (src/'vendor').rglob('*') if p.is_file()]])
+files=sorted([*src.glob('*.qml'),*src.glob('runtime/*.mjs'),*src.glob('runtime/*.py'),*src.glob('scripts/*'),*src.glob('native/*'),src/'runtime/oma-pointer',*src.glob('assets/*'),*src.glob('skills/*/SKILL.md'),*[p for p in (src/'vendor').rglob('*') if p.is_file()]])
 h=hashlib.sha256()
 for p in files:h.update(str(p.relative_to(src)).encode());h.update(p.read_bytes())
 relative='builds/'+h.hexdigest()[:16];build=dst/relative

@@ -37,45 +37,38 @@ It requires an OpenAI API key; API usage is billed separately.
 
 ## Install
 
-With the runtime [requirements](#requirements) available, run:
+Run this in an Omarchy terminal:
 
 ```sh
 omarchy plugin add https://github.com/komagata/oma --enable
 ```
 
-This uses Omarchy's standard plugin manager to clone, validate, and enable O.M.A.
-Select the center section if prompted. Click the brain icon to open the assistant
-and enter your API key. The JavaScript WebSocket dependency is included with its
-license, so no npm install or custom install script is needed for normal use.
+1. Choose the center bar section if prompted, then click the brain icon.
+2. Click **SET UP**. A terminal wizard offers missing system packages, Codex,
+   encrypted key storage, mouse control, voice wake, and the F8 shortcut.
+   Package installation may ask for your system password. Optional steps can be
+   skipped; an existing F8 binding is preserved.
+3. Return to O.M.A. and click **CHECK AGAIN**. Paste your OpenAI API key and click
+   **SAVE KEY**, then **START O.M.A.**
 
-The plugin manager does not install system packages. Node.js, Codex, PipeWire,
-and the other runtime requirements must already be available.
+The plugin manager installs the plugin; the explicit setup wizard handles
+machine dependencies. Nothing is installed silently by the bar. The WebSocket
+library is bundled, so no npm install is needed.
 
-### Optional mouse control and voice wake
-
-Voice conversations, command execution, screenshots, and keyboard control do not
-require a build. For simulated mouse clicks, build the small Wayland helper once:
-
-```sh
-~/.config/omarchy/plugins/io.github.komagata.oma/scripts/build-pointer
-```
-
-This optional build needs a C compiler, `wayland-scanner`, and Wayland client
-headers. A missing helper produces a setup error rather than pretending a click
-succeeded. To install the optional local wake model:
+If the setup window does not open, run:
 
 ```sh
-~/.config/omarchy/plugins/io.github.komagata.oma/scripts/setup-wake
+~/.config/omarchy/plugins/io.github.komagata.oma/scripts/setup
 ```
 
-To add the shortcut, check for an existing F8 binding, then add this to
-`~/.config/hypr/bindings.lua`:
+Setup can be rerun after a failed download or to add optional features. It
+preserves conversation history and existing keys. If a step fails, its error
+stays visible in the terminal. For an old Node.js selected through a version
+manager, update that installation to version 24+ and rerun setup.
 
-```lua
-o.bind("F8", "Open O.M.A.", "omarchy-shell -q io.github.komagata.oma open")
-```
-
-Apply it with `hyprctl reload` and check `hyprctl configerrors`.
+Voice wake currently uses a Japanese Vosk model; other accents are not yet
+validated. Enable **VOICE WAKE** in Settings after setup. Camera support is
+optional and requires FFmpeg and `v4l2-ctl`.
 
 ### API key
 

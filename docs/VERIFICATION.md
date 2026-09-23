@@ -40,3 +40,17 @@ mouth shapes, not phoneme-level animation.
 GitHub Actions runs portable checks; it does not emulate a live Omarchy desktop.
 The current preparation is a source publication, not a signed binary release or
 marketplace certification. No security audit is implied.
+
+## Guided setup verification
+
+The setup regression tests exercise missing Node/Codex dependencies before the
+runtime can start. On Linux with bubblewrap available, the wizard runs with an
+empty home and isolated command path, a read-only host filesystem, and fake
+package-manager/tool installers. Both successful provisioning and package
+installation failure are checked. These fixtures do not verify actual package
+downloads, sudo authentication, gopass key generation, or a fresh Omarchy VM.
+Tests skip the bubblewrap cases when user namespaces are unavailable.
+
+The missing-dependency Settings screen is rendered with fictional data using
+`demo/SetupPreview.qml -- --capture`. The QML test checks that key entry is
+disabled until dependencies are available and that SET UP invokes the service.

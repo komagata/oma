@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# Explicit, interactive machine setup; never run automatically by the shell.
+set -euo pipefail
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+finish() {
+  result=$?
+  if (( result )); then
+    echo
+    echo "Setup did not finish. The error above explains which step failed."
+    echo "You can safely run this setup again."
+  fi
+  read -r -p "Press Enter to close this window." _ || true
+}
+trap finish EXIT
+ask() { local answer; read -r -p "$1 [Y/n] " answer || return 1; [[ "${answer,,}" != n && "${answer,,}" != no ]]; }
+echo "O.M.A. — first-time setup"
+echo "This wizard checks your computer, then offers optional features."
+echo "Your existing conversations, API keys and settings will be preserved."
+echo
+python3 "$root/scripts/check-setup.py"
+packages=()
+while read -r command package; do
+  command -v "$command" >/dev/null || packages+=("$package")
+done <<'PACKAGES'
+node nodejs
+pw-record pipewire-audio
+pw-play pipewire-audio
+pw-cli pipewire
+wpctl wireplumber
+grim grim
+wtype wtype
+xdg-open xdg-utils
+setpriv util-linux
+gopass gopass
+PACKAGES
+if command -v node >/dev/null && ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 24 ? 0 : 1)'; then
+  echo "Node.js is too old. Update the Node installation selected by your PATH to version 24 or newer, then rerun setup."
+  exit 1
+fi
+if (( ${#packages[@]} )); then
+  echo "Required packages: ${packages[*]}"
+  if ask "Install these packages with pacman?"; then
+    sudo pacman -S --needed "${packages[@]}"
+  else
+    echo "Packages were not installed. Run setup again when ready."
+    exit 1
+  fi
+fi
+if ! command -v codex >/dev/null; then
+  if ask "Install Codex with Omarchy's mise installer?"; then
+    omarchy mise install codex
+    mise reshim
+    export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
+  else
+    echo "Codex is required for desktop tasks."
+    exit 1
+  fi
+fi
+echo "Checking Codex (its first run may download the CLI)…"
+codex --version
+if ! find /usr/lib/spa-0.2/aec -name 'libspa-aec-webrtc.so' -print -quit 2>/dev/null | grep -q .; then
+  if ask "Install PipeWire audio support for echo cancellation?"; then
+    sudo pacman -S --needed pipewire-audio
+  fi
+fi
+if ! gopass ls >/dev/null 2>&1; then
+  echo "O.M.A. saves API keys in gopass. Its wizard will create an encrypted password store."
+  if ask "Set up secure key storage now?"; then gopass setup; fi
+fi
+if ask "Enable mouse control (install build tools and compile the helper)?"; then
+  sudo pacman -S --needed gcc wayland
+  "$root/scripts/build-pointer"
+fi
+if ask "Install Hey O.M.A. voice wake (downloads a Japanese speech model)?"; then
+  sudo pacman -S --needed python python-pip curl
+  "$root/scripts/setup-wake"
+  echo "Enable VOICE WAKE in O.M.A. Settings after saving your API key."
+fi
+bindings="$HOME/.config/hypr/bindings.lua"
+if [[ -f "$bindings" ]] && ! grep -q 'io.github.komagata.oma open' "$bindings"; then
+  if ! hyprctl -j binds | python3 -c 'import json,sys; sys.exit(1 if any(str(b.get("key","")).upper()=="F8" for b in json.load(sys.stdin)) else 0)'; then
+    echo "F8 is assigned or could not be checked. Existing shortcuts were preserved; use the bar icon."
+  elif ask "Assign F8 to open O.M.A.?"; then
+    cp -p "$bindings" "$bindings.oma-backup-$(date +%Y%m%d%H%M%S)"
+    printf '\no.bind("F8", "Open O.M.A.", "omarchy-shell -q io.github.komagata.oma open")\n' >> "$bindings"
+    hyprctl reload
+    hyprctl configerrors
+  fi
+fi
+echo
+if ! python3 "$root/scripts/check-setup.py" | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["setupMessage"]); sys.exit(1 if r["setupRequired"] else 0)'; then
+  echo "Some dependencies are still unavailable. Review the message above and rerun setup."
+  exit 1
+fi
+echo "Return to O.M.A., click CHECK AGAIN, then paste your OpenAI API key."
+echo "OpenAI API usage is billed separately from ChatGPT subscriptions."

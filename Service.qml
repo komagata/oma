@@ -21,6 +21,30 @@ Item {
             } catch (e) {}
         } }
     }
+    property bool setupRequired: true
+    property string setupMessage: "Checking runtime dependencies…"
+    function setup() { setupTerminal.running = true }
+    function checkSetup() { if (!setupProbe.running) setupProbe.running = true }
+    Process {
+        id: setupTerminal
+        command: ["omarchy", "launch", "terminal", "bash", Qt.resolvedUrl("scripts/setup").toString().replace(/^file:\/\//, "")]
+    }
+    Process {
+        id: setupProbe
+        command: ["python3", Qt.resolvedUrl("scripts/check-setup.py").toString().replace(/^file:\/\//, "")]
+        running: true
+        stdout: StdioCollector { onStreamFinished: {
+            try {
+                const result = JSON.parse(text)
+                root.setupRequired = result.setupRequired
+                root.setupMessage = result.setupMessage
+                if (!root.setupRequired && !worker.running) worker.running = true
+            } catch (e) {
+                root.setupRequired = true
+                root.setupMessage = "Could not check dependencies. Run scripts/setup from the installed plugin folder."
+            }
+        } }
+    }
     property bool alive: true
     property bool panelOpened: false
     state: "starting"
@@ -48,6 +72,7 @@ Item {
     property int revision: 0
 
     function command(data) {
+        if (setupRequired) return
         if (worker.running) worker.write(JSON.stringify(data) + "\n")
         else { root.error = "O.M.A. is stopped. Click Retry to start it."; root.state = "error" }
     }
@@ -66,7 +91,7 @@ Item {
     function stop() { command({action: "stop"}) }
     function approve(allow) { if (approval) command({action: "approve", id: approval.id, allow: allow}) }
     function answer(answers) { if (question) command({action: "answer", id: question.id, answers: answers}) }
-    function retry() { if (!worker.running) worker.running = true; else command({action: "connect"}) }
+    function retry() { if (setupRequired) { checkSetup(); return }; if (!worker.running) worker.running = true; else command({action: "connect"}) }
     function update(line) {
         if (!alive || line.length > 65536) return
         try {
@@ -84,7 +109,7 @@ Item {
         id: worker
         command: ["node", Qt.resolvedUrl("runtime/main.mjs").toString().replace(/^file:\/\//, "")]
         stdinEnabled: true
-        running: true
+        running: false
         stdout: SplitParser { onRead: data => root.update(data) }
         onExited: { root.keySaving = false; if (root.alive) { root.state = "offline"; root.level = 0; root.inputLevel = 0; root.error = "O.M.A. stopped. Click Retry to reconnect." } }
     }
