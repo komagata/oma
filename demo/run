@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+set -euo pipefail
+omarchy-shell io.github.komagata.oma demo
