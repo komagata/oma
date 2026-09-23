@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+build="$(mktemp -d)"
+trap 'rm -rf "$build"' EXIT
+wayland-scanner client-header "$root/native/wlr-virtual-pointer-unstable-v1.xml" "$build/virtual-pointer.h"
+wayland-scanner private-code "$root/native/wlr-virtual-pointer-unstable-v1.xml" "$build/virtual-pointer.c"
+cc -O2 -Wall -Wextra -I"$build" "$root/native/pointer.c" "$build/virtual-pointer.c" -lwayland-client -o "$root/runtime/oma-pointer"

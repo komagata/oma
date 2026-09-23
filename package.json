@@ -1,0 +1,32 @@
+{
+  "name": "omarchy-oma",
+  "version": "0.1.0",
+  "description": "O.M.A. \u2014 Omarchy Machine Assistant",
+  "scripts": {
+    "test": "node --test --test-isolation=none tests/*.test.mjs"
+  },
+  "keywords": [
+    "omarchy",
+    "voice-assistant",
+    "quickshell",
+    "openai",
+    "codex"
+  ],
+  "author": "komagata",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "ws": "8.21.3"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=24"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/komagata/oma.git"
+  },
+  "bugs": {
+    "url": "https://github.com/komagata/oma/issues"
+  }
+}

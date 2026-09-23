@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Reloading this plugin stops its Codex executor. Keep the complete installation
+# and recovery outside that executor's process group.
+if [[ "${1:-}" != "--apply-independent" ]]; then
+  exec systemd-run --user --wait --collect --service-type=exec --     "$root/scripts/install-local" --apply-independent
+fi
+dest="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins/io.github.komagata.oma"
+[[ -d "$root/node_modules/ws" ]] || { echo 'Run npm ci first.' >&2; exit 1; }
+[[ "$root" != "$dest" ]] || { echo 'Run from the development checkout.' >&2; exit 1; }
+"$root/scripts/build-pointer"
+python3 - "$root" "$dest" <<'PY'
+import sys,shutil,pathlib,hashlib,json,tempfile
+src,dst=map(pathlib.Path,sys.argv[1:]);dst.mkdir(parents=True,exist_ok=True)
+files=sorted([*src.glob('*.qml'),*src.glob('runtime/*.mjs'),*src.glob('runtime/*.py'),src/'runtime/oma-pointer',*src.glob('assets/*'),*src.glob('skills/*/SKILL.md')])
+h=hashlib.sha256()
+for p in files:h.update(str(p.relative_to(src)).encode());h.update(p.read_bytes())
+relative='builds/'+h.hexdigest()[:16];build=dst/relative
+# A new URL avoids stale Qt component caches without restarting omarchy-shell.
+# Stage outside the watched plugin so a new build appears in one rename.
+if not build.exists():
+ staging=pathlib.Path(tempfile.mkdtemp(prefix='oma-build-',dir=dst.parent.parent))
+ try:
+  for p in files:
+   target=staging/p.relative_to(src);target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(p,target)
+  build.parent.mkdir(parents=True,exist_ok=True);staging.rename(build)
+ finally:shutil.rmtree(staging,ignore_errors=True)
+lock=dst/'package-lock.json'
+refresh_modules=not (dst/'node_modules/ws').is_dir() or not lock.exists() or lock.read_bytes()!=(src/'package-lock.json').read_bytes()
+for name in ['README.md','LICENSE','package.json','package-lock.json']:
+ if not (dst/name).exists() or (dst/name).read_bytes()!=(src/name).read_bytes():shutil.copy2(src/name,dst/name)
+if refresh_modules:shutil.copytree(src/'node_modules',dst/'node_modules',dirs_exist_ok=True)
+manifest=json.loads((src/'manifest.json').read_text())
+manifest['entryPoints']={k:relative+'/'+v for k,v in manifest['entryPoints'].items()}
+pending=dst/'manifest.json.pending'
+pending.write_text(json.dumps(manifest,indent=2)+'\n')
+pending.replace(dst/'manifest.json')
+PY
+omarchy-shell shell rescanPlugins
+sleep 2
+python3 "$root/runtime/restart_oma.py"

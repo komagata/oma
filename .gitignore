@@ -1,0 +1,12 @@
+node_modules/
+*.sqlite*
+.env
+artifacts/
+__pycache__/
+
+*.blend1
+
+runtime/oma-pointer
+
+# Local reference screenshot; not needed by the runtime or authoring tools.
+assets/reference-desktop.png

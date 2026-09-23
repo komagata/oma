@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.komagata.oma",
+  "name": "O.M.A.",
+  "version": "0.1.0",
+  "author": "komagata",
+  "license": "MIT",
+  "description": "A persistent voice assistant with a low-poly face, OpenAI Realtime and Codex.",
+  "kinds": [
+    "bar-widget",
+    "panel",
+    "service"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml",
+    "service": "Service.qml",
+    "panel": "Overlay.qml"
+  },
+  "barWidget": {
+    "displayName": "O.M.A.",
+    "description": "A persistent voice assistant with a low-poly face, OpenAI Realtime and Codex.",
+    "category": "AI",
+    "allowMultiple": false,
+    "defaultSection": "center",
+    "defaults": {},
+    "schema": []
+  },
+  "keepLoaded": true
+}
