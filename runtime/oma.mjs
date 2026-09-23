@@ -1,5 +1,5 @@
 import {resolveLocale,languageInstruction,greetingInstruction,transcriptionLanguage} from './locale.mjs';
-import WebSocket from 'ws';
+import WebSocket from '../vendor/ws/wrapper.mjs';
 import {spawn,execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {omaProfile} from './profile.mjs';

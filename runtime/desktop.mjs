@@ -79,7 +79,10 @@ export class Desktop {
    const p=screenPoint(frame,args.x,args.y);
    await this.dispatch(`hl.dsp.cursor.move({x=${p.x},y=${p.y}})`);
    // Keep the press/release in one helper so cancellation cannot leave a held button.
-   this.check();await this.run(fileURLToPath(new URL('./oma-pointer',import.meta.url)),[String(button)]);this.check();
+   this.check();
+   try{await this.run(fileURLToPath(new URL('./oma-pointer',import.meta.url)),[String(button)]);}
+   catch(error){if(error.code==='ENOENT')throw Error('Mouse click helper is not built. Run scripts/build-pointer from the installed O.M.A. plugin directory, then retry.');throw error;}
+   this.check();
   }else{
    const active=await this.json(['activewindow']);if(active.address!==frame.active)throw Error('Focused window changed; take a fresh screenshot');
    if(name==='desktop_type'){

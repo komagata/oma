@@ -44,7 +44,9 @@ executor context. Revision fences reject stale asynchronous results. It does not
 erase external files or backups.
 
 An independent systemd user job reloads O.M.A. and verifies the panel reopened.
-The same isolation protects installation from being killed by its own reload.
+The development installer uses the same isolation. Normal installation and
+updates use the Omarchy plugin manager; the ws library is vendored so no npm
+installation hook is required. The optional mouse helper is built explicitly.
 A hash of the bundled skills prevents reusing a Codex thread with obsolete instructions.
 Task checkpoints record requests and commands before execution completes; after a
 restart they are evidence of potentially interrupted work, not proof of success.

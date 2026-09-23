@@ -24,11 +24,11 @@ It requires an OpenAI API key; API usage is billed separately.
 ## Requirements
 
 - Omarchy Quattro with its Quickshell plugin system and Hyprland Lua dispatchers.
-- Node.js **24+**, npm, Python 3, and systemd user services.
+- Node.js **24+**, Python 3, and systemd user services.
 - Codex CLI with App Server support; tested with **0.155.1**.
 - PipeWire: `pw-record`, `pw-play`, `pw-cli`, `wpctl`, and WebRTC echo cancellation.
 - `grim`, `wtype`, `hyprctl`, `xdg-open`, and `setpriv`.
-- A C compiler, `wayland-scanner`, and Wayland client headers for the pointer helper.
+- Optional mouse clicks: a C compiler, `wayland-scanner`, and Wayland client headers.
 - An OpenAI API key with access to the configured Realtime and Codex models.
 - An initialized, unlocked **gopass** store to save a key through Settings.
   Alternatively, provide `OPENAI_API_KEY` in the desktop session environment.
@@ -37,21 +37,36 @@ It requires an OpenAI API key; API usage is billed separately.
 
 ## Install
 
+With the runtime [requirements](#requirements) available, run:
+
 ```sh
-git clone https://github.com/komagata/oma.git
-cd oma
-npm ci
-./tests/run
-./scripts/install-local
+omarchy plugin add https://github.com/komagata/oma --enable
 ```
 
-Use this source-install workflow rather than bare `omarchy plugin add`: npm
-dependencies and the native pointer helper must be prepared first.
+This uses Omarchy's standard plugin manager to clone, validate, and enable O.M.A.
+Select the center section if prompted. Click the brain icon to open the assistant
+and enter your API key. The JavaScript WebSocket dependency is included with its
+license, so no npm install or custom install script is needed for normal use.
 
-The installer builds the pointer helper, copies a versioned build into
-`~/.config/omarchy/plugins/io.github.komagata.oma`, and enables it in the center
-bar. Installation runs in an independent user service so reloading O.M.A.
-cannot interrupt its own recovery. It reopens the panel without restarting the bar.
+The plugin manager does not install system packages. Node.js, Codex, PipeWire,
+and the other runtime requirements must already be available.
+
+### Optional mouse control and voice wake
+
+Voice conversations, command execution, screenshots, and keyboard control do not
+require a build. For simulated mouse clicks, build the small Wayland helper once:
+
+```sh
+~/.config/omarchy/plugins/io.github.komagata.oma/scripts/build-pointer
+```
+
+This optional build needs a C compiler, `wayland-scanner`, and Wayland client
+headers. A missing helper produces a setup error rather than pretending a click
+succeeded. To install the optional local wake model:
+
+```sh
+~/.config/omarchy/plugins/io.github.komagata.oma/scripts/setup-wake
+```
 
 To add the shortcut, check for an existing F8 binding, then add this to
 `~/.config/hypr/bindings.lua`:
@@ -164,18 +179,13 @@ and `OPENAI_API_KEY`. Models are currently fixed to `gpt-realtime-2.1`,
 ## Update and remove
 
 ```sh
-git pull --ff-only
-npm ci
-./tests/run
-./scripts/install-local
+omarchy plugin update io.github.komagata.oma
 ```
 
-Run the installer on its own; do not append commands that disable O.M.A. from
-its own task executor. The self-restart tool reloads only O.M.A. and verifies
-that its panel reopens. Skill changes invalidate stale executor instructions.
+If you use mouse control, rerun `scripts/build-pointer` in the installed plugin
+after updates that change its native source.
 
 ```sh
-omarchy plugin disable io.github.komagata.oma
 omarchy plugin remove io.github.komagata.oma
 ```
 
@@ -187,10 +197,14 @@ from your normal Codex configuration.
 ## Development
 
 ```sh
-npm ci
+npm ci --ignore-scripts
 ./tests/run
 ./demo/run
 ```
+
+For a separate development checkout, `./scripts/install-local` remains available
+for a non-Git-managed local installation. It refuses to overwrite a Git-managed
+plugin; use the standard update command for those installations.
 
 The suite includes manifest validation, Node tests, shell syntax checks, and
 Qt tests when the required Qt/graphics tooling is available. GitHub Actions runs

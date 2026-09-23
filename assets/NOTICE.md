@@ -20,3 +20,9 @@ The face texture was AI-generated for this project. The mesh, shape keys and
 Blender authoring scripts were created for O.M.A. They are distributed under
 the repository MIT license. Blender is an optional authoring tool, not a runtime
 dependency.
+
+## Runtime and protocol dependencies
+
+The vendored ws WebSocket library is MIT-licensed; its license and version are
+in `vendor/ws/LICENSE` and `vendor/README.md`. The Wayland virtual-pointer protocol
+retains its upstream copyright and license in `native/wlr-virtual-pointer-unstable-v1.xml`.
