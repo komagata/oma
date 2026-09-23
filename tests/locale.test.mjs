@@ -35,3 +35,17 @@ test('greeting has one English source and translates it for other locales',()=>{
   assert.doesNotMatch(instruction,/[ぁ-んァ-ン一-龯]/);
  }
 });
+test('input transcription follows the locale independently of response instructions',()=>{
+ for(const [locale,language] of [['en-US','en'],['en-GB','en'],['ja-JP','ja'],['fr-FR','fr']]){
+  assert.equal(sessionConfig('',locale).audio.input.transcription.language,language);
+ }
+ assert.equal(sessionConfig('',null).audio.input.transcription.language,undefined);
+});
+test('English input transcripts reach the UI and memory unchanged',()=>{
+ const events=[],saved=[];
+ const oma=new Oma({locale:'en-US',memory:{add:(...v)=>saved.push(v)},audio:{},emit:e=>events.push(e)});
+ oma.receive({type:'input_audio_buffer.committed',item_id:'input-1'});
+ oma.receive({type:'conversation.item.input_audio_transcription.completed',item_id:'input-1',transcript:'Change the theme to Tokyo Night.'});
+ assert.deepEqual(events.at(-1),{userText:'Change the theme to Tokyo Night.'});
+ assert.deepEqual(saved.at(-1),['user','Change the theme to Tokyo Night.']);
+});

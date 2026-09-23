@@ -35,3 +35,13 @@ export function reconnectInstruction(locale){
  const speak=reconnectSourceEn;
  return `${languageInstruction(locale)} Use a cool, composed, computer-like voice with clear articulation. Translate the following English source line naturally into the response language and speak only the translation. Do not answer earlier requests or call tools.\n${JSON.stringify(speak)}`;
 }
+
+
+// Realtime transcription is a separate model; response instructions do not
+// configure its input language. Omit unknown/non-ISO-639-1 locales.
+export function transcriptionLanguage(locale){
+ try{
+  const language=new Intl.Locale(locale).language;
+  return /^[a-z]{2}$/.test(language)?language:undefined;
+ }catch{return undefined;}
+}

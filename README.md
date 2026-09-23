@@ -82,7 +82,8 @@ Open the panel and speak when it is ready. O.M.A. starts with
 **“Awaiting your command.”** English locales use that source line; other locales
 receive a natural translation. Replies follow the desktop locale (`LC_ALL`,
 then `LC_MESSAGES`, then `LANG`) unless you request another language.
-UI labels remain English.
+UI labels remain English. Input transcription also receives the locale language
+(e.g. `en` for `en-US`), independently of the spoken-response instructions.
 
 Try:
 
