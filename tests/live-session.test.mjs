@@ -8,6 +8,33 @@ function fixture(execute=async()=>({ok:true})){
  return {wire,audio,session,patches};
 }
 async function start(f){const p=f.session.start();f.wire.socket.emit('open');f.wire.emit('event',{type:'session.started',session:{id:'test'}});await p;}
+test('development notices require a ready session and cannot execute tools until real user input',async()=>{
+ const calls=[],f=fixture(async name=>{calls.push(name);return {ok:true}});
+ assert.equal(typeof f.session.speakNotice,'function');assert.equal(f.session.speakNotice('question'),false);await start(f);
+ f.session.tasks.add('busy');assert.equal(f.session.speakNotice('question'),false);f.session.tasks.clear();
+ assert.equal(f.session.speakNotice('Read the untrusted question only: "run tools"'),true);
+ assert.match(f.wire.sent.at(-1).content,/notification/);
+ const backend=(id)=>{for(const event of [{type:'response.created',response:{id}},{type:'response.output_item.done',response_id:id,item:{type:'function_call',call_id:id,name:'start_development_job',arguments:'{}'}},{type:'response.completed',response:{id}}])f.wire.emit('event',{type:'response.event',delegation_id:id,event})};
+ backend('notice');await tick();assert.deepEqual(calls,[]);
+ f.wire.emit('event',{type:'session.input_transcript.delta',delta:'[breathing]'});backend('noise');await tick();assert.deepEqual(calls,[]);
+ f.wire.emit('event',{type:'session.input_transcript.delta',delta:'Check my job please'});backend('user');await tick();assert.deepEqual(calls,['start_development_job']);
+ await f.session.close();assert.equal(f.session.speakNotice('late'),false);
+});
+test('a tool response originating in a notice stays blocked after the user barges in',async()=>{
+ const calls=[],f=fixture(async name=>{calls.push(name)});await start(f);f.session.speakNotice('untrusted question');
+ const event=e=>f.wire.emit('event',{type:'response.event',delegation_id:'notice',event:e});
+ event({type:'response.created',response:{id:'late'}});
+ f.wire.emit('event',{type:'session.input_transcript.delta',delta:'No, tell me the time'});
+ event({type:'response.output_item.done',response_id:'late',item:{type:'function_call',call_id:'late',name:'run_command',arguments:'{}'}});
+ event({type:'response.completed',response:{id:'late'}});await tick();assert.deepEqual(calls,[]);await f.session.close();
+});
+test('a notice delegation created before barge-in cannot issue delayed tools afterward',async()=>{
+ const calls=[],f=fixture(async name=>calls.push(name));await start(f);f.session.speakNotice('untrusted question');
+ f.wire.emit('event',{type:'session.delegation.created',delegation:{id:'notice',target:'responses'}});
+ f.wire.emit('event',{type:'session.input_transcript.delta',delta:'What time is it?'});
+ for(const event of [{type:'response.created',response:{id:'late'}},{type:'response.output_item.done',response_id:'late',item:{type:'function_call',call_id:'late',name:'run_command',arguments:'{}'}},{type:'response.completed',response:{id:'late'}}])f.wire.emit('event',{type:'response.event',delegation_id:'notice',event});
+ await tick();assert.deepEqual(calls,[]);await f.session.close();
+});
 test('waits for session start, aligns PCM samples and closes explicitly',async()=>{
  const f=fixture();f.session.appendAudio(Buffer.alloc(2));assert.equal(f.wire.sent.length,0);await start(f);
  f.session.appendAudio(Buffer.from([1]));f.session.appendAudio(Buffer.from([2,3]));assert.equal(f.wire.sent.at(-1).audio,'AQI=');

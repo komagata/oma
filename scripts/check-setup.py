@@ -27,6 +27,7 @@ for command, label in [
     ("pw-play", "PipeWire playback"), ("pw-cli", "PipeWire tools"),
     ("wpctl", "WirePlumber"), ("grim", "Screenshots"),
     ("wtype", "Keyboard control"), ("hyprctl", "Hyprland"),
+    ("bwrap", "bubblewrap (Hermes native memory isolation)"),
     ("xdg-open", "Desktop launcher"), ("setpriv", "util-linux"),
 ]:
     if not shutil.which(command):

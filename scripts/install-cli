@@ -2,7 +2,7 @@
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 mkdir -p "$HOME/.local/bin"
-if [[ -e "$HOME/.local/bin/oma" ]] && ! grep -q 'omarchy/plugins/io.github.komagata.oma' "$HOME/.local/bin/oma"; then
+if [[ -e "$HOME/.local/bin/oma" || -L "$HOME/.local/bin/oma" ]] && ! grep -q 'omarchy/plugins/io.github.komagata.oma' "$HOME/.local/bin/oma"; then
   echo 'An unrelated ~/.local/bin/oma already exists; leaving it unchanged.' >&2
   exit 1
 fi

@@ -29,7 +29,7 @@ for (const scenario of ['success','packageFailure','wakeFailure']) test('isolate
  for(const name of ['dirname','python3','find','grep','mkdir','install'])symlinkSync('/usr/bin/'+name,join(bin,name));
  const executable=(name,body)=>writeFileSync(join(bin,name),'#!/bin/bash\n'+body,{mode:0o755});
  executable('sudo',`echo "$*" >> "${dir}/commands"
-${failInstall?'exit 1':`for name in node pw-record pw-play pw-cli wpctl grim wtype xdg-open setpriv secret-tool xdg-terminal-exec systemd-run npm; do
+${failInstall?'exit 1':`for name in node pw-record pw-play pw-cli wpctl grim wtype xdg-open setpriv bwrap secret-tool xdg-terminal-exec systemd-run npm; do
 printf '#!/bin/bash\\necho 24\\n' > "${bin}/$name"
 chmod +x "${bin}/$name"
 done`}
@@ -69,10 +69,10 @@ printf '#!/bin/bash\\necho codex-cli-test\\n' > "${bin}/codex"
 
 // Run the real scripts in a disposable checkout/home. Package installation and
 // desktop commands are fixtures; this does not exercise a GUI or real keyring.
-const requiredCommands=['pw-record','pw-play','pw-cli','wpctl','grim','wtype','hyprctl','xdg-open','setpriv','secret-tool','xdg-terminal-exec','systemd-run','npm'];
+const requiredCommands=['pw-record','pw-play','pw-cli','wpctl','grim','wtype','hyprctl','xdg-open','setpriv','bwrap','secret-tool','xdg-terminal-exec','systemd-run','npm'];
 function setupFixture(t,{missing=[],sdk=true,packageFailure=false,npmFailure=false,omitInstalled=''}={}){
  const dir=mkdtempSync(join(tmpdir(),'oma-first-run-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));
- const bin=join(dir,'bin'),root=join(dir,'checkout'),home=join(dir,'home');
+ const bin=join(dir,'bin'),root=join(dir,'checkout with spaces'),home=join(dir,'home');
  mkdirSync(bin);mkdirSync(root);mkdirSync(join(home,'.config/hypr'),{recursive:true});
  writeFileSync(join(home,'.config/hypr/bindings.lua'),'-- existing user shortcuts\n');
  cpSync(new URL('../scripts',import.meta.url),join(root,'scripts'),{recursive:true});
@@ -92,9 +92,9 @@ function setupFixture(t,{missing=[],sdk=true,packageFailure=false,npmFailure=fal
  command('find','echo /usr/lib/spa-0.2/aec/libspa-aec-webrtc.so');
  command('pacman','exit 1');
  command('omarchy',`echo "$*" >> '${log}'\n${packageFailure?'exit 19':`for name in ${missing.filter(n=>n!==omitInstalled).join(' ')}; do /usr/bin/printf '#!/bin/bash\\nexit 0\\n' > '${bin}/'$name; /usr/bin/chmod +x '${bin}/'$name; done`}`);
- const env={...process.env,PATH:bin,HOME:home,PYTHONPATH:modules};
+ const env={...process.env,PATH:bin,HOME:home,XDG_CONFIG_HOME:join(home,'.config'),PYTHONPATH:modules};
  const probe=()=>JSON.parse(execFileSync('/usr/bin/python3',[join(root,'scripts/check-setup.py')],{env,encoding:'utf8',stdio:['ignore','pipe','pipe']}));
- const run=(input='n\nn\ny\n\n')=>spawnSync('/bin/bash',[join(root,'scripts/setup')],{env,input,encoding:'utf8',timeout:15000});
+ const run=(input='n\nn\ny\n\n',args=[],overrides={})=>spawnSync('/bin/bash',[join(root,'scripts/setup'),...args],{env:{...env,...overrides},input:input?Buffer.from(input):undefined,stdio:[input?'pipe':'ignore','pipe','pipe'],encoding:'utf8',timeout:5000});
  return {probe,run,home,log,bin,marker,command};
 }
 for(const [command,label] of [['secret-tool','keyring'],['xdg-terminal-exec','terminal'],['systemd-run','systemd'],['npm','npm']]){
@@ -135,4 +135,60 @@ test('re-running successful setup preserves its F8 shortcut without adding anoth
  const binding=join(f.home,'.config/hypr/bindings.lua'),before=readFileSync(binding,'utf8');assert.match(before,/shell toggle io.github.komagata.oma/);
  const second=f.run();assert.equal(second.status,0,second.stdout+second.stderr);assert.equal(readFileSync(binding,'utf8'),before);
  assert.equal((readFileSync(f.log,'utf8').match(/reload/g)||[]).length,1);
+});
+
+test('interactive setup checks and installs bubblewrap only after consent',t=>{
+ const f=setupFixture(t,{missing:['bwrap']});assert.match(f.probe().setupMessage,/bubblewrap/i);
+ assert.notEqual(f.run('n\n\n').status,0);assert.equal(existsSync(f.log),false);
+ const accepted=f.run('y\nn\nn\nn\n\n');assert.equal(accepted.status,0,accepted.stdout+accepted.stderr);
+ assert.match(readFileSync(f.log,'utf8'),/pkg add.*bubblewrap/);assert.equal(f.probe().setupRequired,false);
+});
+
+for(const args of [['--help'],['--unknown']])test('setup parses '+args[0]+' before mutation',t=>{
+ const f=setupFixture(t,{missing:['secret-tool']});const r=f.run('',args);
+ assert.equal(r.status,args[0]==='--help'?0:2,r.stdout+r.stderr);assert.equal(existsSync(f.log),false);
+ assert.equal(existsSync(join(f.home,'.local/bin/oma')),false);
+});
+test('unattended setup never accepts missing dependencies without explicit install consent',t=>{
+ const f=setupFixture(t,{sdk:false});const r=f.run('', ['--non-interactive']);
+ assert.notEqual(r.status,0);assert.match(r.stdout+r.stderr,/--install-missing/);assert.equal(existsSync(f.log),false);
+});
+test('unattended npm failure is actionable and can be retried idempotently',t=>{
+ const f=setupFixture(t,{sdk:false,npmFailure:true});const args=['--non-interactive','--install-missing'];
+ assert.notEqual(f.run('',args).status,0);
+ f.command('npm',`echo "npm $*" >> '${f.log}'; touch '${f.marker}'`);
+ const before=readFileSync(join(f.home,'.config/hypr/bindings.lua'),'utf8');
+ for(let i=0;i<2;i++){const r=f.run('',args);assert.equal(r.status,0,r.stdout+r.stderr);assert.doesNotMatch(r.stdout,/Press Enter/);}
+ assert.equal(readFileSync(join(f.home,'.config/hypr/bindings.lua'),'utf8'),before);
+ assert.doesNotMatch(readFileSync(f.log,'utf8'),/reload|pkg add|wake/);
+});
+test('unattended setup preserves conflicting CLI and returns failure',t=>{
+ const f=setupFixture(t);mkdirSync(join(f.home,'.local/bin'),{recursive:true});
+ const cli=join(f.home,'.local/bin/oma');writeFileSync(cli,'unrelated command');
+ const r=f.run('', ['--non-interactive']);assert.notEqual(r.status,0);assert.equal(readFileSync(cli,'utf8'),'unrelated command');
+});
+test('interactive EOF declines dependency installation',t=>{
+ const f=setupFixture(t,{sdk:false});const r=f.run('');assert.notEqual(r.status,0);assert.equal(r.error,undefined);assert.equal(existsSync(f.log),false);
+});
+test('F8 setup respects XDG_CONFIG_HOME and preserves existing HOME bindings',t=>{
+ const f=setupFixture(t);const xdg=join(f.home,'custom config');mkdirSync(join(xdg,'hypr'),{recursive:true});
+ const bindings=join(xdg,'hypr/bindings.lua');writeFileSync(bindings,'-- custom shortcuts\n');
+ const original=readFileSync(join(f.home,'.config/hypr/bindings.lua'),'utf8');
+ const r=f.run('n\nn\ny\n\n',[],{XDG_CONFIG_HOME:xdg});assert.equal(r.status,0,r.stdout+r.stderr);
+ assert.match(readFileSync(bindings,'utf8'),/shell toggle io.github.komagata.oma/);
+ assert.equal(readFileSync(join(f.home,'.config/hypr/bindings.lua'),'utf8'),original);
+});
+for(const scenario of ['success','privilegeFailure','incomplete'])test('unattended scoped package installation: '+scenario,t=>{
+ const f=setupFixture(t,{missing:['secret-tool']});
+ f.command('sudo',`echo "sudo $*" >> '${f.log}'\n${scenario==='privilegeFailure'?'exit 1':scenario==='incomplete'?'exit 0':`/usr/bin/printf '#!/bin/bash\\nexit 0\\n' > '${f.bin}/secret-tool'; /usr/bin/chmod +x '${f.bin}/secret-tool'`}`);
+ const r=f.run('', ['--non-interactive','--install-missing']);
+ assert.equal(r.status===0,scenario==='success',r.stdout+r.stderr);assert.equal(r.error,undefined);
+ assert.match(readFileSync(f.log,'utf8'),/sudo -n pacman -S --needed --noconfirm libsecret/);
+ assert.doesNotMatch(readFileSync(f.log,'utf8'),/-Syu|-Sy |reload|pkg add/);
+ if(scenario==='privilegeFailure')assert.match(r.stdout+r.stderr,/terminal privilege.*|Open a terminal/);
+});
+test('CLI installation refuses an unrelated dangling symlink without creating its target',t=>{
+ const f=setupFixture(t);mkdirSync(join(f.home,'.local/bin'),{recursive:true});
+ const target=join(f.home,'unrelated-target');symlinkSync(target,join(f.home,'.local/bin/oma'));
+ const r=f.run('', ['--non-interactive']);assert.notEqual(r.status,0);assert.equal(r.error,undefined);assert.equal(existsSync(target),false);
 });

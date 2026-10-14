@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+"""Read-only installation diagnostics. Never retrieve keys or start a conversation."""
+import argparse
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+ID = "io.github.komagata.oma"
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--json", action="store_true", help="Print only redacted JSON")
+parser.add_argument("--plugin-dir", type=Path, help="Installed folder containing manifest.json")
+args = parser.parse_args()
+config = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
+plugin = args.plugin_dir or Path(os.environ.get("OMA_PLUGIN_DIR") or config / "omarchy/plugins" / ID)
+
+
+def run_json(command, timeout=10):
+    # Discard stderr: CLI errors can contain provider data or user transcripts.
+    result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                            stderr=subprocess.DEVNULL, timeout=timeout, check=True)
+    return json.loads(result.stdout)
+
+
+checks = {}
+missing = [name for name in ("omarchy", "omarchy-shell", "hyprctl") if not shutil.which(name)]
+wayland = bool(os.environ.get("WAYLAND_DISPLAY")) and os.environ.get("WAYLAND_DISPLAY") != "omabox-guard"
+environment_ok = sys.platform.startswith("linux") and wayland and not missing
+checks["environment"] = {"available": environment_ok, "missingCommands": missing,
+                         "action": "Run in the user's supported Omarchy Quattro Linux Wayland session. Do not migrate desktops." if not environment_ok else ""}
+plugin_ok = False
+try:
+    manifest = json.loads((plugin / "manifest.json").read_text())
+    if manifest.get("id") != ID:
+        raise ValueError("Unexpected plugin")
+    service = (plugin / manifest["entryPoints"]["service"]).resolve()
+    payload = service.parent.parent if service.parent.name == "qml" else service.parent
+    if not (payload / "scripts/check-setup.py").is_file():
+        raise ValueError("Missing payload")
+    plugin_ok = True
+except (OSError, ValueError, TypeError, KeyError):
+    payload = None
+checks["plugin"] = {"available": plugin_ok,
+                    "action": "Locate the installed manifest; pass --plugin-dir or OMA_PLUGIN_DIR. Validate/rescan only O.M.A." if not plugin_ok else ""}
+dependencies = {"setupRequired": True, "setupMessage": "Could not check the installed payload."}
+if payload:
+    try:
+        probe = run_json([sys.executable, str(payload / "scripts/check-setup.py")], timeout=25)
+        if not isinstance(probe.get("setupRequired"), bool):
+            raise ValueError("Invalid dependency check")
+        # The shipped check reports dependency labels only; never forward arbitrary output.
+        dependencies = {"setupRequired": probe["setupRequired"]}
+    except (OSError, ValueError, AttributeError, subprocess.SubprocessError):
+        pass
+checks["dependencies"] = {**dependencies,
+                          "action": "Run bash <manifest-resolved-payload>/scripts/setup; use --non-interactive --install-missing only with package consent." if dependencies["setupRequired"] else ""}
+skill_candidates = [os.environ.get("OMA_OMARCHY_SKILL"),
+                    *[str(Path.home() / base / "omarchy/SKILL.md") for base in (".agents/skills", ".pi/agent/skills", ".codex/skills")],
+                    *[str(Path(os.environ.get("OMARCHY_PATH") or "/usr/share/omarchy") / base / "omarchy/SKILL.md")
+                      for base in ("default/agents/skills", "default/skills")]]
+skill_ok = any(path and Path(path).is_file() for path in skill_candidates)
+checks["omarchySkill"] = {"available": skill_ok, "action": "Check the official $OMARCHY_PATH/default/agents/skills/omarchy/SKILL.md (normally /usr/share/omarchy). Restore it through supported Omarchy setup; do not copy developer skills or create personal links." if not skill_ok else ""}
+status = {}
+service_ok = False
+try:
+    candidate = run_json(["omarchy-shell", ID, "status"])
+    if isinstance(candidate.get("setupRequired"), bool):
+        status = candidate
+        service_ok = True
+except (OSError, ValueError, AttributeError, subprocess.SubprocessError):
+    pass
+checks["service"] = {"available": service_ok, "setupRequired": status.get("setupRequired") if service_ok else None,
+                     "action": "Enable/rescan O.M.A. if absent. Call retry after setup only while service setupRequired is true; recheck status. If needed disable/enable only O.M.A., preserving its bar placement." if not service_ok or status.get("setupRequired") else ""}
+agent = status.get("agentBackend", "codex")
+if agent not in ("codex", "claude", "hermes", "openclaw"):
+    agent = "codex"
+terminal_available = bool(shutil.which(agent))
+options = status.get("agentOptions", [])
+gui_available = next((option.get("available") for option in options if isinstance(option, dict) and option.get("value") == agent), None) if isinstance(options, list) else None
+available = gui_available if isinstance(gui_available, bool) else (False if service_ok else None)
+checks["agent"] = {"selected": agent, "executableAvailable": available, "terminalExecutableAvailable": terminal_available,
+                   "authentication": "UNVERIFIED", "action": "Have the user install/configure and authenticate the selected CLI separately. Executable presence does not prove authentication; compare GUI and terminal PATH."}
+key_configured = status.get("keyConfigured") if isinstance(status.get("keyConfigured"), bool) else None
+checks["voice"] = {"keyConfigured": key_configured, "authentication": "UNVERIFIED", "audioDevices": "UNVERIFIED",
+                   "action": "User enters the API key in O.M.A. Settings, unlocks the keyring if needed, then approves billable Test voice and a short microphone/desktop-tool check. Never paste keys into chat or argv."}
+installation_ready = (environment_ok and plugin_ok and skill_ok and not dependencies["setupRequired"] and service_ok
+                      and status.get("setupRequired") is False and available is True)
+report = {"installationReady": installation_ready, "voiceReady": False, "checks": checks}
+if args.json:
+    print(json.dumps(report))
+else:
+    print("Installation prerequisites: " + ("ready" if installation_ready else "incomplete"))
+    print("Voice readiness: UNVERIFIED (credentials, agent authentication and physical audio need user checks)")
+    for name, check in checks.items():
+        print(name + ": " + json.dumps(check))
+sys.exit(0 if installation_ready else 1)

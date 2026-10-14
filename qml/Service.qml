@@ -13,6 +13,10 @@ Item {
     property string setupMessage: "Checking runtime dependencies…"
     property string setupLaunchError: ""
     property bool setupBusy: setupTerminal.running
+    property string agentBackend: "codex"
+    property var agentOptions: []
+    property string agentError: ""
+    function setAgentBackend(value) { command({action: "setAgentBackend", value: value}) }
     property var responseLanguages: []
     property string responseLanguage: ""
     property string languageError: ""
@@ -143,10 +147,13 @@ Item {
             const d = JSON.parse(line)
             for (const k of ["taskBusy", "backendStatus", "docked", "viewMode"])
                 if (d[k] !== undefined) root[k] = d[k]
-            for (const k of ["responseLanguages", "responseLanguage", "languageError", "microphones", "microphoneTarget", "microphoneBusy", "microphoneError", "voiceProvider", "latency", "connectionTesting", "connectionTestPassed", "connectionTestError", "modelReady", "speechReady", "omarchySkillLoaded", "modelProvider", "modelName", "cameraActive", "listeningReady", "approvalListening", "wakeEnabled", "voiceEffectsEnabled", "wakeStatus", "keyConfigured", "keySaving", "keyError", "keySaved", "computerUsing", "state", "userText", "assistantText", "error", "taskText", "taskStatus", "approval", "question", "level", "inputLevel", "lipRound", "lipWide"])
+            for (const k of ["agentBackend", "agentOptions", "agentError", "responseLanguages", "responseLanguage", "languageError", "microphones", "microphoneTarget", "microphoneBusy", "microphoneError", "voiceProvider", "latency", "connectionTesting", "connectionTestPassed", "connectionTestError", "modelReady", "speechReady", "omarchySkillLoaded", "modelProvider", "modelName", "cameraActive", "listeningReady", "approvalListening", "wakeEnabled", "voiceEffectsEnabled", "wakeStatus", "keyConfigured", "keySaving", "keyError", "keySaved", "computerUsing", "state", "userText", "assistantText", "error", "taskText", "taskStatus", "approval", "question", "level", "inputLevel", "lipRound", "lipWide"])
                 if (d[k] !== undefined) root[k] = d[k]
             if (d.dismiss === true) dismissRequested()
-            if (d.wakeDetected === true) show(true)
+            if (d.wakeDetected === true) {
+                if (d.developmentNotice === true) show(false, true)
+                else show(true)
+            }
             root.revision++
             if (d.keySaved === true) { worker.running = false; restartWorker.start() }
         } catch (e) { root.error = "Invalid response from O.M.A." }
@@ -178,9 +185,10 @@ Item {
         function accompany(address: string): void { root.command({action: "accompanyWindow", address: address}) }
         function restoreFloating(): void { root.command({action: "restoreFloating"}) }
         function viewMode(mode: string): void { root.setViewMode(mode) }
+        function agentBackend(value: string): void { root.setAgentBackend(value) }
         function responseLanguage(value: string): void { root.setResponseLanguage(value) }
         function voiceEffects(enabled: bool): void { root.setVoiceEffects(enabled) }
         function microphone(value: string): void { root.setMicrophone(value) }
-        function status(): string { return JSON.stringify({modelProvider: root.modelProvider, modelName: root.modelName, taskStatus: root.taskStatus, taskBusy: root.taskBusy, backendStatus: root.backendStatus, docked: root.docked, viewMode: root.viewMode, responseLanguage: root.responseLanguage, languageError: root.languageError, microphoneTarget: root.microphoneTarget, microphoneBusy: root.microphoneBusy, microphoneError: root.microphoneError, onboardingVersion: 2, voiceProvider: root.voiceProvider, latency: root.latency, setupBusy: root.setupBusy, setupRequired: root.setupRequired, modelReady: root.modelReady, speechReady: root.speechReady, connectionTestPassed: root.connectionTestPassed, panelOpened: root.panelOpened, accentColor: String(root.accentColor), state: root.state, listeningReady: root.listeningReady, error: root.error, level: root.level, inputLevel: root.inputLevel, keyConfigured: root.keyConfigured, wakeEnabled: root.wakeEnabled, voiceEffectsEnabled: root.voiceEffectsEnabled, wakeStatus: root.wakeStatus, approvalListening: root.approvalListening}) }
+        function status(): string { return JSON.stringify({agentBackend: root.agentBackend, agentOptions: root.agentOptions, agentError: root.agentError, modelProvider: root.modelProvider, modelName: root.modelName, taskStatus: root.taskStatus, taskBusy: root.taskBusy, backendStatus: root.backendStatus, docked: root.docked, viewMode: root.viewMode, responseLanguage: root.responseLanguage, languageError: root.languageError, microphoneTarget: root.microphoneTarget, microphoneBusy: root.microphoneBusy, microphoneError: root.microphoneError, onboardingVersion: 2, voiceProvider: root.voiceProvider, latency: root.latency, setupBusy: root.setupBusy, setupRequired: root.setupRequired, modelReady: root.modelReady, speechReady: root.speechReady, connectionTestPassed: root.connectionTestPassed, panelOpened: root.panelOpened, accentColor: String(root.accentColor), state: root.state, listeningReady: root.listeningReady, error: root.error, level: root.level, inputLevel: root.inputLevel, keyConfigured: root.keyConfigured, wakeEnabled: root.wakeEnabled, voiceEffectsEnabled: root.voiceEffectsEnabled, wakeStatus: root.wakeStatus, approvalListening: root.approvalListening}) }
     }
 }

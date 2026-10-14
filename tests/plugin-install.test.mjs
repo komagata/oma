@@ -39,7 +39,7 @@ test('explicit package includes every relative runtime import and QML resource',
    }
   }
  }
- for(const name of ['skills/oma/SKILL.md','skills/oma-camera/SKILL.md','runtime/streaming-vocoder.py','runtime/wake.py','runtime/wake_match.py','runtime/restart_oma.py','runtime/oma-pointer','assets/FaceMesh.js','assets/reference-face.png','assets/crt.frag.qsb','assets/startup.pcm','scripts/setup','scripts/check-setup.py','scripts/build-pointer','scripts/setup-wake','scripts/install-cli','scripts/oma'])assert.ok(files.has(name),name);
+ for(const name of ['skills/oma/SKILL.md','skills/oma-camera/SKILL.md','runtime/streaming-vocoder.py','runtime/wake.py','runtime/wake_match.py','runtime/restart_oma.py','runtime/oma-pointer','assets/FaceMesh.js','assets/reference-face.png','assets/crt.frag.qsb','assets/startup.pcm','scripts/setup','scripts/check-setup.py','scripts/doctor','scripts/build-pointer','scripts/setup-wake','scripts/install-cli','scripts/oma'])assert.ok(files.has(name),name);
  const dependencies=JSON.parse(readFileSync(join(root,'package.json'))).dependencies;
  assert.deepEqual(Object.keys(dependencies).sort(),['openai','ws']);
  const lock=JSON.parse(readFileSync(join(root,'package-lock.json')));

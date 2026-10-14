@@ -24,12 +24,18 @@ qml/components/ScanLines.qml
 qml/components/TypewriterText.qml
 qml/views/Conversation.qml
 qml/views/Settings.qml
+runtime/agent-backends.mjs
+runtime/agent-tool-bridge.mjs
+runtime/agent-tool-mcp.mjs
 runtime/audio.mjs
 runtime/camera.mjs
 runtime/caption-text.mjs
+runtime/client-delegation.mjs
 runtime/conversation-end.mjs
 runtime/credentials.mjs
 runtime/desktop.mjs
+runtime/dev-jobs.mjs
+runtime/dev-job-notifier.mjs
 runtime/farewell-intent.mjs
 runtime/farewell-playback.mjs
 runtime/hyprland-context.mjs
@@ -66,6 +72,7 @@ runtime/wake_match.py
 runtime/window-companion.mjs
 scripts/build-pointer
 scripts/check-setup.py
+scripts/doctor
 scripts/install-cli
 scripts/oma
 scripts/runtime-files.txt

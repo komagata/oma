@@ -29,7 +29,7 @@ function commandContext() {
  const source=readFileSync(new URL('../runtime/main-live.mjs',import.meta.url),'utf8');
  const body=source.slice(source.indexOf('async function command(c)'),source.indexOf('const input=createInterface'));
  const calls=[];const companion={setAutoVisible(v){calls.push(['auto',v])},restore(){calls.push('restore')},setPanelState(a,c){calls.push(['panel',a,c])}};
- const ctx={tools:{companion},presented:true,transcriptLog:{begin(){},end(){}},idle:{show(){}},start:async()=>{},stop:async()=>calls.push('stop')};
+ const ctx={switchingAgent:false,tools:{companion},presented:true,transcriptLog:{begin(){},end(){}},idle:{show(){}},start:async()=>{},stop:async()=>calls.push('stop')};
  vm.runInNewContext(body,ctx);return {ctx,calls};
 }
 test('presentation stopping and automatic visibility cancellation never restore visible layout',async()=>{

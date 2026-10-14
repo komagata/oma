@@ -13,6 +13,11 @@ TestCase {
   property bool connectionTesting: false; property bool connectionTestPassed: false; property string connectionTestError: ""
   property bool voiceEffectsEnabled: true; function setVoiceEffects(enabled){voiceEffectsEnabled=enabled}
   property bool wakeEnabled: false; function setWake(enabled){wakeEnabled=enabled}
+  property string agentBackend: "codex"
+  property var agentOptions: [{value:"codex",label:"Codex CLI",note:"CLI found"},{value:"claude",label:"Claude Code",note:"CLI found; authenticate separately"},{value:"hermes",label:"Hermes Agent",note:"Not found on PATH"},{value:"openclaw",label:"OpenClaw",note:"CLI found"}]
+  property string agentError: ""
+  property bool taskBusy: false
+  function setAgentBackend(value){agentBackend=value}
   property string modelProvider: "fixture"; property string modelName: "model"
   property var responseLanguages: [{value:"",label:"System default (Japanese)"},{value:"en",label:"English"},{value:"ja",label:"Japanese"}]
   property string responseLanguage: ""
@@ -81,6 +86,23 @@ TestCase {
   input.text="fictional-key";compare(save.enabled,true);save.clicked();compare(fake.savedKey,"fictional-key");compare(input.text,"")
   compare(input.placeholderText,"*********");compare(save.enabled,false)
   fake.keyConfigured=false;compare(input.placeholderText,"Paste your OpenAI API key");compare(input.text,"");compare(save.enabled,false)
+ }
+ function test_agent_selection_preserves_binding_and_displays_errors(){
+  settings.started=true;fake.modelReady=true;fake.speechReady=true;fake.agentBackend="codex"
+  const picker=findChild(settings,"agentSelect");verify(picker!==null);verify(picker.visible)
+  compare(picker.value,"codex");compare(picker.options.length,4)
+  const permissions=findChild(settings,"agentPermissions")
+  verify(permissions.text.indexOf("built-in tools use a read-only sandbox")>=0);verify(permissions.text.indexOf("does not constrain OMA MCP")>=0)
+  verify(permissions.text.indexOf("write files, run commands and control the desktop")>=0);verify(permissions.text.indexOf("O.M.A.'s OS permissions")>=0)
+  verify(permissions.text.indexOf("explicit confirm_action")>=0);verify(permissions.text.indexOf("do not automatically gate")>=0)
+  picker.value="claude";picker.changed("claude");compare(fake.agentBackend,"claude")
+  compare(picker.value,"claude");verify(permissions.text.indexOf("Claude's built-in tools use its own permissions")>=0);verify(permissions.text.indexOf("explicit confirm_action")>=0);verify(permissions.text.indexOf("read-only")<0);verify(findChild(settings,"agentNote").text.indexOf("authenticate separately")>=0)
+  fake.agentBackend="hermes";compare(picker.value,"hermes");verify(findChild(settings,"agentNote").text.indexOf("Not found")>=0)
+  fake.taskBusy=true;compare(picker.enabled,false);fake.taskBusy=false
+  fake.agentError="CLI failed";compare(findChild(settings,"agentError").text,"CLI failed");fake.agentError=""
+ }
+ function test_agent_default_without_service(){
+  settings.service=null;compare(findChild(settings,"agentSelect").value,"codex");settings.service=fake
  }
  function test_language_selection_preserves_binding(){
   settings.started=true;fake.modelReady=true;fake.speechReady=true

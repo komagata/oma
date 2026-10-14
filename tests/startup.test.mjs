@@ -14,7 +14,7 @@ test('GPT-Live startup does not cut the opening cue during microphone checks',as
  const source=readFileSync(new URL('../runtime/main-live.mjs',import.meta.url),'utf8');
  const start=source.slice(source.indexOf('async function start('),source.indexOf('async function stop('));
  let ready,playing=false,recorded=false,prepared=0;
- const context={prepare(){assert.equal(context.session.started,true);prepared++},desktopContext:{},idle:null,presented:true,starting:null,session:null,key:'fixture',closing:false,
+ const context={withAgentTools:agent=>agent,localToolDefinitions:[],agentRegistry:{get(){return {id:"openai"}}},prepare(){assert.equal(context.session.started,true);prepared++},desktopContext:{},idle:null,presented:true,starting:null,session:null,key:'fixture',closing:false,
   microphoneAvailable:()=>new Promise(resolve=>{ready=resolve}),wake:{pause(){}},
   cue:{play(){playing=true},stop(){playing=false}},tools:{begin(){},cancel(){}},
   Date,cachedFarewell:()=>null,process:{env:{}},voiceEffectsEnabled:()=>true,startupGreeting:{active:false},greetingCache:{load(){return null}},responseLocale(){return 'ja'},emit(){},liveConfig(){return {}},memory:{get(){return ''}},

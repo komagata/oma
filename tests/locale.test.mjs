@@ -37,8 +37,7 @@ test('saved response language overrides locale and system default follows it',as
  assert.ok(languageOptions(env).some(x=>x.value==='ja'));
  const {liveConfig}=await import('../runtime/live-config.mjs');
  const config=liveConfig({facts:()=>[],get:k=>k==='responseLanguage'?'de':null},env);
- assert.equal(config.delegation.responses.reasoning.effort,'low');
+ assert.deepEqual(config.delegation,{type:'client'});
  assert.match(config.instructions,/Reply in German/);
- assert.match(config.delegation.responses.instructions,/Reply in German/);
  assert.doesNotMatch(config.instructions,/desktop locale is de/);
 });

@@ -9,6 +9,8 @@ TestCase {
     width: 712; height: 762
     QtObject {
         id: fixture
+        property string agentBackend: "codex"
+        property string agentError: ""
         property string viewMode: "normal"
         function setViewMode(mode) { viewMode=mode }
         property string state: "idle"
@@ -26,6 +28,13 @@ TestCase {
         property var question: null
     }
     Oma.Conversation { id: conversation; width: 600; height: 650; service: fixture }
+    function test_agent_label_and_failure_are_visible() {
+        fixture.agentBackend="codex";compare(findChild(conversation,"linkStatus").text.indexOf("CODEX"),0)
+        fixture.agentError="Codex CLI: failed";compare(findChild(conversation,"taskStatusText").text,fixture.agentError)
+        fixture.agentBackend="claude";compare(findChild(conversation,"linkStatus").text.indexOf("CLAUDE"),0)
+        fixture.agentBackend="";compare(findChild(conversation,"linkStatus").text.indexOf("CODEX"),0)
+        fixture.agentBackend="codex";fixture.agentError=""
+    }
     function test_mini_mode_only_shows_face_and_restores_transcripts() {
         fixture.userText="Hello"
         const face=findChild(conversation,"faceModeToggle")

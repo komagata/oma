@@ -1,10 +1,30 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';import {runInNewContext} from 'node:vm';
+import {createAgentBackends} from '../runtime/agent-backends.mjs';
 import {omaProfile,profileSkills} from '../runtime/profile.mjs';
+import {liveConfig} from '../runtime/live-config.mjs';
+
+for(const backend of ['codex','claude','hermes','openclaw'])for(const [language,label] of [['en','English'],['ja','Japanese']]){
+ test(`live voice identifies as Oma and retains written O.M.A. branding during delegated readback (${backend}, ${language})`,()=>{
+  const config=liveConfig({facts:()=>[],get:key=>key==='agentBackend'?backend:key==='responseLanguage'?language:null},{OMA_OMARCHY_SKILL:new URL('../skills/oma/SKILL.md',import.meta.url).pathname,OMA_LIVE_VOICE:'marin'});
+  assert.match(config.instructions,/^You are Oma\./);
+  assert.match(config.instructions,/Oma is your natural spoken name \(OH-mah in English, オーマ in Japanese\)/);
+  assert.match(config.instructions,/Use O\.M\.A\. only as the written UI brand\. In Japanese reply text, write your own name as オーマ so it is spoken オーマ\. When asked who or what you are in Japanese, begin exactly with 私はオーマです。 Never put O\.M\.A\. in Japanese reply text\./);
+  assert.match(config.instructions,/When reading delegated answers and agent commentary, replace the written brand O\.M\.A\. with your spoken name Oma\./);
+  assert.match(config.instructions,/preserve the factual wording of short answers/);
+  assert.doesNotMatch(config.instructions,/You are O\.M\.A\.|Name pronunciation rule:|ˈoʊmɑː|individual letters O, M, A|while applying the name pronunciation rule/);
+  assert.match(config.instructions,new RegExp(`Reply in ${label}`));
+  assert.match(config.instructions,/Delegate user questions and action requests/);
+  assert.equal(config.model,'gpt-live-1');assert.equal(config.store,false);
+  assert.deepEqual(config.audio,{format:{type:'audio/pcm',rate:24000},output:{voice:'marin'}});
+  assert.deepEqual(config.delegation,{type:'client'});
+ });
+}
+
 test('O.M.A. skills describe GPT-Live and local tools',()=>{
  assert.deepEqual(profileSkills,['oma','oma-camera']);
- assert.match(omaProfile,/Responses backend/);assert.match(omaProfile,/camera_snapshot/);
- assert.match(omaProfile,/Omarchy skill/);assert.doesNotMatch(omaProfile,/Codex|delegate.*run_task/);
+ assert.match(omaProfile,/private OMA MCP/);assert.match(omaProfile,/camera_snapshot/);
+ assert.match(omaProfile,/Omarchy skill/);assert.doesNotMatch(omaProfile,/delegate.*run_task/);assert.match(omaProfile,/Codex CLI/);
 });
 
 test('the loaded OMA skill identifies spoken and written aliases as the assistant itself',()=>{
@@ -14,56 +34,25 @@ test('loaded OMA skill routes transcript opening to the portable CLI',()=>{
  assert.match(omaProfile,/oma transcript --today/);assert.match(omaProfile,/oma transcript --follow/);assert.match(omaProfile,/ログを見せて/);assert.match(omaProfile,/xdg-open/);
 });
 
-test('Live receives the skill delegation policy for follow-up document actions',async()=>{
- const {liveConfig}=await import('../runtime/live-config.mjs');
- const config=liveConfig({facts:()=>[],get:()=>null});
- for(const phrase of ['Backend tools:', 'Delegate to the backend when:', 'Do not delegate to the backend when:', 'close a window', 'new blank document', 'Each follow-up'])assert.ok(config.instructions.includes(phrase),phrase);
- assert.ok(config.delegation.responses.instructions.includes('new_text_document'));
-});
-
-test('desktop procedures belong to the backend rather than the voice routing prompt',async()=>{
- const {liveConfig}=await import('../runtime/live-config.mjs');
- const config=liveConfig({facts:()=>[],get:()=>null});
+test('voice routes requests to the selected agent and keeps backend procedures out of the speech prompt',async()=>{
+ const {liveConfig}=await import('../runtime/live-config.mjs');const config=liveConfig({facts:()=>[],get:()=>null});
+ assert.match(config.instructions,/Delegate user questions and action requests/);assert.match(config.instructions,/Do not claim an action succeeded before its result/);
  assert.doesNotMatch(config.instructions,/new_text_document|oma transcript --today/);
- assert.match(config.delegation.responses.instructions,/new_text_document/);
- assert.match(config.delegation.responses.instructions,/oma transcript --today/);
+ assert.match(omaProfile,/new_text_document/);assert.match(omaProfile,/oma transcript --today/);
+ assert.doesNotMatch(omaProfile,/Delegate to the backend when:|Do not delegate to the backend when:/);assert.match(omaProfile,/execute.*tools directly/i);
 });
-
-test('execution backends do not receive the speech frontend delegation policy',async()=>{
- const {liveConfig}=await import('../runtime/live-config.mjs');
- const config=liveConfig({facts:()=>[],get:()=>null});
- for(const instructions of [omaProfile,config.delegation.responses.instructions]){
-  assert.doesNotMatch(instructions,/Delegate to the backend when:|Do not delegate to the backend when:/);
-  assert.match(instructions,/execute.*tools directly/i);
- }
- assert.match(config.instructions,/Delegate to the backend when:/);
+test('voice describes private MCP capabilities without promising tools to Hermes or OpenClaw',async()=>{
+ const {omaClientDelegationInstructions}=await import('../runtime/profile.mjs');
+ assert.match(omaClientDelegationInstructions,/Codex.*Claude.*OMA.*MCP/);
+ assert.match(omaClientDelegationInstructions,/Hermes.*OpenClaw.*do not/);
+ assert.doesNotMatch(omaClientDelegationInstructions,/External agents do not receive/);
+ assert.match(omaClientDelegationInstructions,/local confirmation buttons/);
 });
-
-test('Live defaults to Luna low while retaining the voice model',async()=>{
- const {liveConfig}=await import('../runtime/live-config.mjs');
- const config=liveConfig({facts:()=>[],get:()=>null},{OMA_OMARCHY_SKILL:new URL('../skills/oma/SKILL.md',import.meta.url).pathname});
- assert.equal(config.delegation.responses.model,'gpt-6-luna');
- assert.equal(config.delegation.responses.reasoning.effort,'low');
- assert.equal(config.model,'gpt-live-1');
-});
-
-test('Live preserves an explicit backend model override',async()=>{
- const {liveConfig}=await import('../runtime/live-config.mjs');
- const config=liveConfig({facts:()=>[],get:()=>null},{OMA_OMARCHY_SKILL:new URL('../skills/oma/SKILL.md',import.meta.url).pathname,OMA_BACKEND_MODEL:'gpt-5.6-luna'});
- assert.equal(config.delegation.responses.model,'gpt-5.6-luna');
- assert.equal(config.delegation.responses.reasoning.effort,'low');
- assert.equal(config.model,'gpt-live-1');
-});
-
-test('Live status reports the configured backend model for defaults and overrides',async()=>{
- const {liveConfig}=await import('../runtime/live-config.mjs');
- const source=readFileSync(new URL('../runtime/main-live.mjs',import.meta.url),'utf8');
- const status=source.slice(source.indexOf('function status()'),source.indexOf('\nconst tools='));
- const memory={facts:()=>[],get:()=>null};
- for(const override of [undefined,'gpt-5.6-luna']){
-  const env={OMA_OMARCHY_SKILL:new URL('../skills/oma/SKILL.md',import.meta.url).pathname,...(override?{OMA_BACKEND_MODEL:override}:{})};
-  let emitted;
-  runInNewContext(status+';status();',{process:{env},key:null,findOmarchySkill:()=>env.OMA_OMARCHY_SKILL,languageOptions:()=>[],voiceEffectsEnabled:()=>true,memory,emit:value=>{emitted=value}});
-  assert.equal(emitted.modelName,liveConfig(memory,env).delegation.responses.model);
+test('Live status reports the selected CLI separately from GPT-Live voice and ignores obsolete model overrides',()=>{
+ const source=readFileSync(new URL('../runtime/main-live.mjs',import.meta.url),'utf8');const status=source.slice(source.indexOf('function status()'),source.indexOf('\nconst tools='));
+ for(const [backend,label] of [['','Codex CLI'],['codex','Codex CLI'],['claude','Claude Code'],['hermes','Hermes Agent'],['openclaw','OpenClaw']]){
+  let emitted;const memory={get:key=>key==='agentBackend'?backend:''};
+  runInNewContext(status+';status();',{process:{env:{OMA_BACKEND_MODEL:'obsolete'}},key:'fictional',findOmarchySkill:()=>'/fixture',languageOptions:()=>[],voiceEffectsEnabled:()=>true,agentRegistry:createAgentBackends(),memory,emit:value=>{emitted=value}});
+  assert.equal(emitted.modelName,label);assert.equal(emitted.modelProvider,label);assert.equal(emitted.agentBackend,backend||'codex');assert.equal(emitted.voiceProvider,'gpt-live');assert.equal(emitted.keyConfigured,true);
  }
 });

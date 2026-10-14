@@ -21,10 +21,10 @@ export function screenPoint(frame,x,y){
  if(!Number.isFinite(x)||!Number.isFinite(y)||x<0||y<0||x>=frame.width||y>=frame.height)throw Error('Coordinates outside screenshot');
  return {x:frame.rect.x+Math.floor(x*frame.rect.width/frame.width),y:frame.rect.y+Math.floor(y*frame.rect.height/frame.height)};
 }
-export function runDesktopCommand(command,args,{signal,input}={}){
+export function runDesktopCommand(command,args,{signal,input,cwd}={}){
  return new Promise((resolve,reject)=>{
   signal?.throwIfAborted();
-  const child=spawn(command,args,{stdio:['pipe','pipe','pipe']});let chunks=[],size=0,errors='',settled=false;
+  const child=spawn(command,args,{cwd,stdio:['pipe','pipe','pipe']});let chunks=[],size=0,errors='',settled=false;
   const finish=(error,value)=>{
    if(settled)return;settled=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);
    if(error){child.kill('SIGKILL');child.stdin.destroy();child.stdout.destroy();child.stderr.destroy();reject(error);}

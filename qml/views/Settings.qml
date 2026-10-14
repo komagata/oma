@@ -120,6 +120,32 @@ Item {
             }
             Rule { visible: root.ready }
             Section {
+                title: "Task agent"; visible: root.ready
+                Ui.Dropdown {
+                    id: agentSelect; objectName: "agentSelect"
+                    width: parent.width; label: "Agent"
+                    foreground: root.primaryText; accent: ink.accent; background: ink.field
+                    options: root.service && root.service.agentOptions ? root.service.agentOptions : []
+                    value: root.service ? root.service.agentBackend : "codex"
+                    enabled: !root.busy && !!root.service && !root.service.taskBusy && options.length > 0
+                    onChanged: value => {
+                        root.service.setAgentBackend(value)
+                        agentSelect.value = Qt.binding(() => root.service ? root.service.agentBackend : "codex")
+                    }
+                }
+                Copy { text: "GPT-Live provides the voice. The selected agent handles your requests. Switching restarts the conversation session." }
+                Copy {
+                    objectName: "agentPermissions"; visible: !!root.service
+                    text: root.service && ["codex", "claude"].includes(root.service.agentBackend)
+                        ? (root.service.agentBackend === "codex" ? "Codex's built-in tools use a read-only sandbox by default. It does not constrain OMA MCP tools. " : "Claude's built-in tools use its own permissions. ")
+                          + "OMA MCP can write files, run commands and control the desktop with O.M.A.'s OS permissions. Buttons answer explicit confirm_action requests; instructions require confirmation for consequential actions, but do not automatically gate every tool call."
+                        : "CLI agents use their own permissions. O.M.A. approval buttons cannot approve their tool calls."
+                }
+                Copy { objectName: "agentNote"; text: { const options = root.service && root.service.agentOptions ? root.service.agentOptions : []; const selected = options.find(option => option.value === (root.service ? root.service.agentBackend : "codex")); return selected ? selected.note : "" } }
+                Copy { objectName: "agentError"; visible: text.length > 0; text: root.service ? root.service.agentError : ""; color: ink.accent }
+            }
+            Rule { visible: root.ready }
+            Section {
                 title: "Preferences"; visible: root.ready
                 Ui.Toggle { objectName: "wakeToggle"; width: parent.width; label: "Wake on ‘Hey O.M.A.’"; foreground: root.primaryText; accent: ink.accent; checked: !!(root.service && root.service.wakeEnabled); enabled: root.ready; onClicked: if (root.service) root.service.setWake(!checked) }
             }

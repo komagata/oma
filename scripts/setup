@@ -1,6 +1,27 @@
 #!/usr/bin/env bash
-# Explicit, interactive machine setup; never run automatically by the shell.
+# Explicit machine setup; never run automatically by the shell.
 set -euo pipefail
+non_interactive=0
+install_missing=0
+usage() {
+  cat <<'HELP'
+Usage: scripts/setup [--non-interactive] [--install-missing]
+Default: ask before installing dependencies and optional features.
+--non-interactive  Never prompt; skip optional echo cancellation, mouse, wake and F8.
+--install-missing  In unattended mode, consent to the listed missing required
+                  packages and locked npm dependencies. System packages use
+                  sudo -n pacman -S --needed --noconfirm; unavailable privilege
+                  requires a human terminal. No system upgrade or CLI authentication.
+HELP
+}
+for argument in "$@"; do
+  case "$argument" in
+    --non-interactive) non_interactive=1 ;;
+    --install-missing) install_missing=1 ;;
+    --help|-h) usage; exit 0 ;;
+    *) echo "Unknown setup option: $argument" >&2; usage >&2; exit 2 ;;
+  esac
+done
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 finish() {
   result=$?
@@ -9,14 +30,23 @@ finish() {
     echo "Setup did not finish. The error above explains which step failed."
     echo "You can safely run this setup again."
   fi
-  read -r -p "Press Enter to return to O.M.A." _ || true
+  if (( ! non_interactive )); then read -r -p "Press Enter to return to O.M.A." _ || true; fi
 }
 trap finish EXIT
-ask() { local answer; read -r -p "$1 [Y/n] " answer || return 1; [[ "${answer,,}" != n && "${answer,,}" != no ]]; }
+ask() { (( ! non_interactive )) || return 1; local answer; read -r -p "$1 [Y/n] " answer || return 1; [[ "${answer,,}" != n && "${answer,,}" != no ]]; }
 install_packages() {
   if pacman -Q "$@" >/dev/null 2>&1; then return 0; fi
   # Machine-wide updates may restart the shell; they belong outside app setup.
-  omarchy pkg add "$@"
+  if (( non_interactive )); then
+    echo "Installing only these missing required packages: $*"
+    if ! sudo -n pacman -S --needed --noconfirm "$@" </dev/null; then
+      echo "Package installation failed or terminal privilege is unavailable. Missing packages: $*" >&2
+      echo "Open a terminal and run: bash \"$root/scripts/setup\"" >&2
+      return 1
+    fi
+  else
+    omarchy pkg add "$@"
+  fi
 }
 echo "O.M.A. — first-time setup"
 echo "Check this computer and install the required components."
@@ -37,6 +67,7 @@ grim grim
 wtype wtype
 xdg-open xdg-utils
 setpriv util-linux
+bwrap bubblewrap
 secret-tool libsecret
 xdg-terminal-exec xdg-terminal-exec
 systemd-run systemd
@@ -48,23 +79,23 @@ if command -v node >/dev/null && ! node -e 'process.exit(Number(process.versions
 fi
 if (( ${#packages[@]} )); then
   echo "Required packages: ${packages[*]}"
-  if ask "Install missing packages?"; then
+  if (( non_interactive && install_missing )) || ask "Install missing packages?"; then
     install_packages "${packages[@]}"
   else
-    echo "Packages were not installed. Run setup again when ready."
+    echo "Packages were not installed. Use --non-interactive --install-missing for explicit install consent, or run setup in a terminal."
     exit 1
   fi
 fi
 if ! (cd "$root" && node --input-type=module -e "await import('openai/resources/live/ws')") >/dev/null 2>&1; then
-  if ask "Install the voice conversation dependencies?"; then
+  if (( non_interactive && install_missing )) || ask "Install the voice conversation dependencies?"; then
     (cd "$root" && npm ci --omit=dev --ignore-scripts --bin-links=false)
   else
-    echo "GPT-Live SDK is required. Run SET UP again when ready."
+    echo "GPT-Live SDK is required. Use --non-interactive --install-missing for explicit install consent, or run SET UP in a terminal."
     exit 1
   fi
 fi
 echo "Return to O.M.A. after closing this window to connect your AI."
-if ! find /usr/lib/spa-0.2/aec -name 'libspa-aec-webrtc.so' -print -quit 2>/dev/null | grep -q .; then
+if (( ! non_interactive )) && ! find /usr/lib/spa-0.2/aec -name 'libspa-aec-webrtc.so' -print -quit 2>/dev/null | grep -q .; then
   if ask "Install echo cancellation support?"; then
     install_packages pipewire-audio
   fi
@@ -82,8 +113,8 @@ if ask "Enable voice wake? (optional; downloads Japanese and English recognition
     echo "Voice wake was not installed. F8 and the bar icon still work; rerun SET UP to retry."
   fi
 fi
-bindings="$HOME/.config/hypr/bindings.lua"
-if [[ -f "$bindings" ]] && ! grep -Eq 'io\.github\.komagata\.oma open|shell (open|toggle) io\.github\.komagata\.oma([[:space:]]|$)' "$bindings"; then
+bindings="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/bindings.lua"
+if (( ! non_interactive )) && [[ -f "$bindings" ]] && ! grep -Eq 'io\.github\.komagata\.oma open|shell (open|toggle) io\.github\.komagata\.oma([[:space:]]|$)' "$bindings"; then
   if ! hyprctl -j binds | python3 -c 'import json,sys; sys.exit(1 if any(str(b.get("key","")).upper()=="F8" for b in json.load(sys.stdin)) else 0)'; then
     echo "F8 is assigned or could not be checked. Existing shortcuts were preserved; use the bar icon."
   elif ask "Use F8 to toggle O.M.A.?"; then
@@ -102,5 +133,7 @@ if ! python3 "$root/scripts/check-setup.py" | python3 -c 'import json,sys; r=jso
   exit 1
 fi
 /bin/bash "$root/scripts/install-cli"
-echo "Computer setup is complete. Press Enter to continue in O.M.A."
+echo "Computer setup is complete. Runtime dependencies are ready."
+if (( ! non_interactive )); then echo "Press Enter to continue in O.M.A."; fi
+echo "Voice readiness still requires your API key, task-agent authentication and audio verification."
 echo "OpenAI API usage is billed separately from ChatGPT subscriptions."

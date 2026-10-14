@@ -24,7 +24,7 @@ Item {
     property var service: null
     property color accentColor: service && service.accentColor !== undefined ? service.accentColor : "#cacccc"
     OmaPalette { id: ink; accent: root.accentColor }
-    readonly property bool miniMode: !!service && service.viewMode === "mini" && !service.approval && !service.question && !service.error
+    readonly property bool miniMode: !!service && service.viewMode === "mini" && !service.approval && !service.question && !service.error && !service.agentError
     property bool opened: true
     property int startupSerial: 0
     property bool shuttingDown: false
@@ -109,7 +109,7 @@ Item {
             }
             Text {
                 objectName: "linkStatus"
-                text: "GPT-LIVE · " + (root.offline ? (root.status === "unauthenticated" ? "NO KEY" : "OFFLINE") : root.linked ? "LINKED" : root.status === "connecting" ? "CONNECTING" : "STANDBY")
+                text: (root.service && root.service.agentBackend ? String(root.service.agentBackend).toUpperCase() : "CODEX") + " · " + (root.offline ? (root.status === "unauthenticated" ? "NO KEY" : "OFFLINE") : root.linked ? "LINKED" : root.status === "connecting" ? "CONNECTING" : "STANDBY")
                 textFormat: Text.PlainText
                 color: root.linked ? ink.text : ink.secondary; font.pixelSize: 9; font.letterSpacing: 2
             }
@@ -381,7 +381,7 @@ Item {
         visible: !root.miniMode
         x: 14; width: parent.width - 28; height: 28
         y: footer.y - height - 6
-        readonly property bool errorShown: !!root.service && !!root.service.error
+        readonly property bool errorShown: !!root.service && !!(root.service.error || root.service.agentError)
         Rectangle {
             anchors.fill: parent
             visible: statusText.text.length > 0
@@ -402,7 +402,7 @@ Item {
                 objectName: "taskStatusText"
                 anchors.verticalCenter: parent.verticalCenter
                 width: parent.width - x - trailing.width - 12
-                text: root.service ? root.service.error || root.displayedTask : ""
+                text: root.service ? root.service.agentError || root.service.error || root.displayedTask : ""
                 textFormat: Text.PlainText
                 color: ink.text
                 font.pixelSize: 12
