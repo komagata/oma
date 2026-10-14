@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import QtQml.Models
 import "views"
 import "components"
 import QtQuick.Window
@@ -125,7 +126,7 @@ Item {
     Timer { interval: 500; repeat: true; running: root.opened && !root.service; onTriggered: root.resolveService() }
     OmaPalette { id: ink; accent: root.service ? root.service.accentColor : "#cacccc" }
     // Desktop context for the holographic map: normalized geometry of the
-    // windows on O.M.A.'s monitor workspace, excluding O.M.A. itself.
+    // windows on O.M.A.'s monitor workspace, including O.M.A. itself.
     readonly property var contextMonitor: targetScreen ? Hyprland.monitorFor(targetScreen) : Hyprland.focusedMonitor
     property var desktopWindows: []
     property string desktopWorkspace: ""
@@ -141,23 +142,34 @@ Item {
             const at = info.at, size = info.size
             if (!at || !size || info.hidden || info.mapped === false) continue
             const app = String(info.class || info.initialClass || "")
-            // Other Quickshell apps (OmaText, LINE…) are real windows; skip only O.M.A. itself.
-            if (/^O\.M\.A\.( Mini)?$/.test(toplevel.title)) continue
+            // Identify self by title; other Quickshell applications remain ordinary windows.
+            const isOma = /^O\.M\.A\.( Mini)?$/.test(toplevel.title)
             const x = clamp((at[0] - monitor.x) / width), y = clamp((at[1] - monitor.y) / height)
             windows.push({x: x, y: y, w: clamp((at[0] - monitor.x + size[0]) / width) - x, h: clamp((at[1] - monitor.y + size[1]) / height) - y,
-                title: String(toplevel.title || app).slice(0, 80), app: app.toLowerCase().slice(0, 40),
+                title: String(toplevel.title || app).slice(0, 80), app: isOma ? "O.M.A." : app.toLowerCase().slice(0, 40), isOma: isOma,
                 history: Number(info.focusHistoryID), focused: false})
         }
         // O.M.A. usually holds focus itself, so mark the most recently focused other window.
         let recent = null
-        for (const window of windows) if (window.history >= 0 && (!recent || window.history < recent.history)) recent = window
+        for (const window of windows) if (!window.isOma && window.history >= 0 && (!recent || window.history < recent.history)) recent = window
         if (recent) recent.focused = true
         desktopWindows = windows
         desktopWorkspace = String(workspace.name || workspace.id)
         desktopAspect = width / height
     }
     function refreshDesktop() { if (!opened) return; Hyprland.refreshToplevels(); desktopSettle.restart() }
-    // lastIpcObject fills in asynchronously after a refresh.
+    // Refresh after a newly mapped toplevel joins the workspace. Metadata can
+    // arrive after the settle timer, so also rebuild when its IPC object changes.
+    Instantiator {
+        model: root.contextMonitor && root.contextMonitor.activeWorkspace ? root.contextMonitor.activeWorkspace.toplevels : null
+        delegate: Connections {
+            required property var modelData
+            target: modelData
+            function onLastIpcObjectChanged() { if (root.opened) desktopSettle.restart() }
+        }
+        onObjectAdded: root.refreshDesktop()
+        onObjectRemoved: root.refreshDesktop()
+    }
     Timer { id: desktopSettle; interval: 150; onTriggered: root.rebuildDesktop() }
     Connections {
         target: Hyprland
@@ -193,7 +205,7 @@ Item {
         title: root.miniMode ? "O.M.A. Mini" : "O.M.A."
         maximumSize: root.miniMode && !root.docked ? Qt.size(160, 200) : Qt.size(16777215, 16777215)
         minimumSize: root.docked ? Qt.size(root.miniMode ? 160 : 320, root.miniMode ? 200 : 540) : root.miniMode ? Qt.size(160, 200) : Qt.size(Math.min(600, screen ? screen.width - 48 : 600), Math.min(600, screen ? screen.height - 64 : 600))
-        onVisibleChanged: { root.syncAutoCompanion(); if (!visible && root.opened && !(root.service && root.service.computerUsing)) root.close() }
+        onVisibleChanged: { root.syncAutoCompanion(); if (visible) root.refreshDesktop(); if (!visible && root.opened && !(root.service && root.service.computerUsing)) root.close() }
         // A regular application window, managed by the compositor.
         implicitWidth: root.miniMode ? 160 : Math.min(640, screen ? screen.width - 48 : 640)
         implicitHeight: root.miniMode ? 200 : Math.min(760, screen ? screen.height - 64 : 760)

@@ -2,7 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 
 // Schematic of the workspace O.M.A. is aware of, projected behind the face.
-// Windows use normalized monitor geometry; the focused one becomes the
+// Windows use normalized monitor geometry; the most recent other app becomes the
 // highlighted target while a task is running.
 Item {
     id: root
@@ -13,7 +13,7 @@ Item {
     property color accentColor: "#cacccc"
     property color labelColor: "#808080"
     readonly property var focusedWindow: {
-        for (const window of windows) if (window.focused) return window
+        for (const window of windows) if (!window.isOma && window.focused) return window
         return null
     }
     readonly property real headerHeight: 16
@@ -57,40 +57,42 @@ Item {
         Item {
             id: windowBox
             required property var modelData
-            readonly property bool highlighted: modelData.focused
+            readonly property bool ownWindow: !!modelData.isOma
+            readonly property bool highlighted: !ownWindow && modelData.focused
             readonly property color tint: root.accentColor
             x: root.mapX + modelData.x * root.mapWidth + 3
             y: root.mapY + modelData.y * root.mapHeight + 3
             width: Math.max(8, modelData.w * root.mapWidth - 6)
             height: Math.max(8, modelData.h * root.mapHeight - 6)
-            opacity: highlighted ? 1 : .7
+            opacity: ownWindow || highlighted ? 1 : .7
             Rectangle {
                 anchors.fill: parent; radius: 3
                 color: Qt.rgba(windowBox.tint.r, windowBox.tint.g, windowBox.tint.b, windowBox.highlighted ? .07 : .02)
                 border.width: windowBox.highlighted ? 1.5 : 1
-                border.color: Qt.rgba(windowBox.tint.r, windowBox.tint.g, windowBox.tint.b, windowBox.highlighted ? .75 : .24)
+                border.color: Qt.rgba(windowBox.tint.r, windowBox.tint.g, windowBox.tint.b, windowBox.ownWindow ? .72 : windowBox.highlighted ? .75 : .24)
             }
             Rectangle {
                 y: 14; width: parent.width; height: 1
                 color: Qt.rgba(windowBox.tint.r, windowBox.tint.g, windowBox.tint.b, windowBox.highlighted ? .5 : .14)
             }
             Text {
-                x: 6; y: 3; width: parent.width - appLabel.implicitWidth - 16
-                text: windowBox.modelData.title; textFormat: Text.PlainText; elide: Text.ElideRight
+                x: 6; y: 3; width: parent.width - (windowBox.ownWindow ? 12 : appLabel.implicitWidth + 16)
+                text: windowBox.ownWindow ? "O.M.A. · SELF" : windowBox.modelData.title
+                textFormat: Text.PlainText; elide: Text.ElideRight
                 color: windowBox.tint; opacity: windowBox.highlighted ? .95 : .5
                 font.pixelSize: 7; font.letterSpacing: 1
             }
             Text {
                 id: appLabel
                 anchors.right: parent.right; anchors.rightMargin: 6; y: 3
-                visible: parent.width > 70
+                visible: !windowBox.ownWindow && parent.width > 70
                 text: windowBox.modelData.app; textFormat: Text.PlainText
                 color: windowBox.tint; opacity: windowBox.highlighted ? .8 : .3
                 font.pixelSize: 7; font.letterSpacing: 1
             }
             // Placeholder rows; window contents are never captured.
             Repeater {
-                model: Math.max(0, Math.floor((windowBox.height - 26) / 12))
+                model: windowBox.ownWindow ? 0 : Math.max(0, Math.floor((windowBox.height - 26) / 12))
                 Rectangle {
                     required property int index
                     x: 8; y: 24 + index * 12; height: 2; radius: 1
@@ -99,7 +101,7 @@ Item {
                 }
             }
             Repeater {
-                model: windowBox.highlighted ? 4 : 0
+                model: windowBox.highlighted && !windowBox.ownWindow ? 4 : 0
                 Item {
                     id: corner
                     required property int index
